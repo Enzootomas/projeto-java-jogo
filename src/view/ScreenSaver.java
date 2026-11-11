@@ -160,14 +160,14 @@ public class ScreenSaver extends JPanel implements ActionListener {
         InputMap im = getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW);
         ActionMap am = getActionMap();
 
-        // Mapeamento de teclas direcionais (Pressionar e Soltar)
-        vincularTecla(im, am, "W", "UP");
-        vincularTecla(im, am, "UP", "UP");
-        vincularTecla(im, am, "A", "LEFT");
-        vincularTecla(im, am, "LEFT", "LEFT");
-        vincularTecla(im, am, "D", "RIGHT");
-        vincularTecla(im, am, "RIGHT", "RIGHT");
-        vincularTecla(im, am, "DOWN", "DOWN");
+        // Mapeamento individual de cada tecla física direcional (Pressionar e Soltar)
+        vincularTeclaFisica(im, am, "W", "W");
+        vincularTeclaFisica(im, am, "UP", "UP");
+        vincularTeclaFisica(im, am, "A", "A");
+        vincularTeclaFisica(im, am, "LEFT", "LEFT");
+        vincularTeclaFisica(im, am, "D", "D");
+        vincularTeclaFisica(im, am, "RIGHT", "RIGHT");
+        vincularTeclaFisica(im, am, "DOWN", "DOWN");
 
         // Tecla S: no salao move para baixo; na mesa de blackjack aciona PARAR (Stand)
         im.put(KeyStroke.getKeyStroke("pressed S"), "press_S");
@@ -175,7 +175,7 @@ public class ScreenSaver extends JPanel implements ActionListener {
             @Override
             public void actionPerformed(ActionEvent e) {
                 if (estadoAtual == GameState.SALAO) {
-                    teclasPressionadas.add("DOWN");
+                    teclasPressionadas.add("S");
                 } else if (estadoAtual == GameState.MENU_BLACKJACK && blackjackTableView != null) {
                     blackjackTableView.processarTecla("STAND");
                 }
@@ -185,7 +185,7 @@ public class ScreenSaver extends JPanel implements ActionListener {
         am.put("rel_S", new AbstractAction() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                teclasPressionadas.remove("DOWN");
+                teclasPressionadas.remove("S");
             }
         });
 
@@ -260,22 +260,22 @@ public class ScreenSaver extends JPanel implements ActionListener {
         });
     }
 
-    private void vincularTecla(InputMap im, ActionMap am, String tecla, String comando) {
-        im.put(KeyStroke.getKeyStroke("pressed " + tecla), "press_" + comando);
-        am.put("press_" + comando, new AbstractAction() {
+    private void vincularTeclaFisica(InputMap im, ActionMap am, String tecla, String codigoFisico) {
+        im.put(KeyStroke.getKeyStroke("pressed " + tecla), "press_" + codigoFisico);
+        am.put("press_" + codigoFisico, new AbstractAction() {
             @Override
             public void actionPerformed(ActionEvent e) {
                 if (estadoAtual == GameState.SALAO) {
-                    teclasPressionadas.add(comando);
+                    teclasPressionadas.add(codigoFisico);
                 }
             }
         });
 
-        im.put(KeyStroke.getKeyStroke("released " + tecla), "rel_" + comando);
-        am.put("rel_" + comando, new AbstractAction() {
+        im.put(KeyStroke.getKeyStroke("released " + tecla), "rel_" + codigoFisico);
+        am.put("rel_" + codigoFisico, new AbstractAction() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                teclasPressionadas.remove(comando);
+                teclasPressionadas.remove(codigoFisico);
             }
         });
     }
@@ -352,13 +352,18 @@ public class ScreenSaver extends JPanel implements ActionListener {
         mesaBlackjack.updateOrigins(originX, originY);
 
         if (estadoAtual == GameState.SALAO) {
-            // Calcula direção visual desejada na tela a partir das teclas ativas
+            // Calcula direção visual desejada na tela a partir das teclas físicas ativas
+            boolean moveUp = teclasPressionadas.contains("W") || teclasPressionadas.contains("UP");
+            boolean moveDown = teclasPressionadas.contains("S") || teclasPressionadas.contains("DOWN");
+            boolean moveLeft = teclasPressionadas.contains("A") || teclasPressionadas.contains("LEFT");
+            boolean moveRight = teclasPressionadas.contains("D") || teclasPressionadas.contains("RIGHT");
+
             double dirSx = 0.0;
             double dirSy = 0.0;
-            if (teclasPressionadas.contains("UP")) dirSy -= 1.0;
-            if (teclasPressionadas.contains("DOWN")) dirSy += 1.0;
-            if (teclasPressionadas.contains("LEFT")) dirSx -= 1.0;
-            if (teclasPressionadas.contains("RIGHT")) dirSx += 1.0;
+            if (moveUp) dirSy -= 1.0;
+            if (moveDown) dirSy += 1.0;
+            if (moveLeft) dirSx -= 1.0;
+            if (moveRight) dirSx += 1.0;
 
             // Movimentação com vetor normalizado, velocidade constante e colisão com deslizamento
             player.moveIsometric(dirSx, dirSy, VELOCIDADE_AVATAR, dt, WORLD_SIZE, WORLD_SIZE, obstaculos);
@@ -465,7 +470,9 @@ public class ScreenSaver extends JPanel implements ActionListener {
         g2d.drawString("Controles: WASD ou Setas (Movimento em diagonal) | ESC: Sair", 35, 68);
 
         g2d.setColor(new Color(100, 255, 150));
-        g2d.drawString("Saldo Virtual: 50.000 Fichas (Sem dinheiro real)", 35, 88);
+        long saldo = (blackjackEngine != null) ? blackjackEngine.getSaldoVirtual() : 0L;
+        String saldoFormatado = String.format(java.util.Locale.GERMAN, "%,d", saldo);
+        g2d.drawString("Saldo Virtual: " + saldoFormatado + " Fichas (Sem dinheiro real)", 35, 88);
     }
 
     private void desenharBalcaoInteracao(Graphics2D g2d) {
@@ -533,6 +540,32 @@ public class ScreenSaver extends JPanel implements ActionListener {
         if (estadoAtual == GameState.MENU_BLACKJACK && blackjackTableView != null) {
             blackjackTableView.processarTecla(comando);
         }
+    }
+
+    public void simularPressionarTecla(String codigoFisico) {
+        if (estadoAtual == GameState.SALAO) {
+            this.teclasPressionadas.add(codigoFisico);
+        }
+    }
+
+    public void simularSoltarTecla(String codigoFisico) {
+        this.teclasPressionadas.remove(codigoFisico);
+    }
+
+    public boolean isMovendoParaCima() {
+        return teclasPressionadas.contains("W") || teclasPressionadas.contains("UP");
+    }
+
+    public boolean isMovendoParaBaixo() {
+        return teclasPressionadas.contains("S") || teclasPressionadas.contains("DOWN");
+    }
+
+    public boolean isMovendoParaEsquerda() {
+        return teclasPressionadas.contains("A") || teclasPressionadas.contains("LEFT");
+    }
+
+    public boolean isMovendoParaDireita() {
+        return teclasPressionadas.contains("D") || teclasPressionadas.contains("RIGHT");
     }
 }
 
