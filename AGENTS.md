@@ -16,3 +16,7 @@ Este é um trabalho didático em dupla de POO e jogos 2D. A equipe deve compreen
 - Compilar e relatar exatamente os testes executados; não afirmar que GUI ou som foram testados sem execução.
 - Não marcar requisitos como concluídos antes da verificação.
 - Não criar histórico de contribuições fictício. Cada integrante deve realizar seus próprios commits e revisar o colega.
+- Política de Git e Branches:
+  - Fazer commits pequenos, atômicos e coerentes no padrão obrigatório: `tipo(escopo): descrição curta em português` (ex.: `feat(view)`, `fix(mesa)`, `test(poo)`, `refactor(audio)`).
+  - Fazer push exclusivamente em branches de trabalho designadas para a frente da dupla (ex.: `feat/mundo-interface-blackjack`).
+  - Proibida qualquer alteração direta, commit, push ou merge na branch `main`. A integração na `main` será feita apenas em momento oportuno após revisão completa.
