@@ -184,8 +184,8 @@ public class BlackjackTableView {
         int centroY = altura / 2 - 35;
 
         // Placar de aposta da rodada
-        long apostaExibida = (engine.getEstadoRodada() == RoundState.AGUARDANDO_APOSTA) ?
-                apostaPreparada : engine.getApostaAtual();
+        long apostaExibida = (engine.getEstadoRodada() == RoundState.TURNO_JOGADOR) ?
+                engine.getApostaAtual() : apostaPreparada;
 
         g.setColor(new Color(0, 0, 0, 140));
         g.fillRoundRect(centroX - 160, centroY - 22, 320, 44, 20, 20);
@@ -504,7 +504,7 @@ public class BlackjackTableView {
             } else if (btnFicha1000.contains(mx, my)) {
                 adicionarAposta(1000L);
             } else if (btnLimparAposta.contains(mx, my)) {
-                apostaPreparada = 20L; // Reinicia para aposta par mínima permitida
+                limparAposta();
             } else if (btnApostar.contains(mx, my)) {
                 acionarApostar();
             }
@@ -538,6 +538,9 @@ public class BlackjackTableView {
                 adicionarAposta(100L);
             } else if ("FICHA_3".equals(comando)) {
                 adicionarAposta(500L);
+            } else if ("LIMPAR".equals(comando)) {
+                limparAposta();
+                return true;
             }
         } else if (estado == RoundState.TURNO_JOGADOR) {
             if ("PEDIR_CARTA".equals(comando) || "HIT".equals(comando)) {
@@ -569,6 +572,13 @@ public class BlackjackTableView {
         } catch (ArithmeticException ex) {
             exibirAlerta("O valor da aposta excede o limite numérico permitido!");
         }
+    }
+
+    /**
+     * Zera a seleção atual de fichas preparadas para a próxima aposta.
+     */
+    public void limparAposta() {
+        this.apostaPreparada = 0L;
     }
 
     /**
