@@ -3,6 +3,7 @@ package model;
 import javax.imageio.ImageIO;
 import java.awt.Color;
 import java.awt.Font;
+import java.awt.FontMetrics;
 import java.awt.Graphics2D;
 import java.awt.Image;
 import java.io.File;
@@ -76,6 +77,25 @@ public class CasinoTable extends MyRectangle {
     }
 
     /**
+     * Calcula a distância ao quadrado entre o centro da base física desta mesa
+     * e o centro da base física do avatar.
+     * Usado para desempate determinístico quando o avatar está ao alcance de duas mesas.
+     */
+    public double getDistanceSqToPlayer(MyCharacter player) {
+        if (player == null) {
+            return Double.MAX_VALUE;
+        }
+        double mesaCenterX = this.x + (this.width * 0.5);
+        double mesaCenterY = this.y + (this.height * 0.5);
+        double playerCenterX = player.getX() + (player.getWidth() * 0.5);
+        double playerCenterY = player.getY() + (player.getHeight() * 0.5);
+
+        double dx = mesaCenterX - playerCenterX;
+        double dy = mesaCenterY - playerCenterY;
+        return (dx * dx) + (dy * dy);
+    }
+
+    /**
      * Renderiza a mesa projetada na tela.
      */
     @Override
@@ -98,6 +118,24 @@ public class CasinoTable extends MyRectangle {
             // Fallback geométrico desenhando a base isométrica
             g.setColor(this.color);
             g.fillOval(screenFootX - 40, screenFootY - 20, 80, 40);
+        }
+
+        // Plaqueta de identificação visual da mesa
+        if (this.gameName != null && !this.gameName.isEmpty()) {
+            g.setFont(new Font("SansSerif", Font.BOLD, 10));
+            FontMetrics fm = g.getFontMetrics();
+            String rotulo = this.gameName.toUpperCase();
+            int strW = fm.stringWidth(rotulo);
+            int rotuloX = screenFootX - (strW / 2);
+            int rotuloY = screenFootY - 50;
+
+            g.setColor(new Color(0, 0, 0, 175));
+            g.fillRoundRect(rotuloX - 5, rotuloY - fm.getAscent() - 2, strW + 10, fm.getHeight() + 4, 6, 6);
+            g.setColor(new Color(255, 215, 0));
+            g.drawRoundRect(rotuloX - 5, rotuloY - fm.getAscent() - 2, strW + 10, fm.getHeight() + 4, 6, 6);
+
+            g.setColor(new Color(255, 235, 130));
+            g.drawString(rotulo, rotuloX, rotuloY);
         }
     }
 
