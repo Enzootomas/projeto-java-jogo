@@ -85,6 +85,11 @@ public class BlackjackTableView {
 
         // 8. Mensagem de alerta temporária (ex.: aposta ímpar ou saldo insuficiente)
         desenharAlerta(g, largura, altura);
+
+        // 9. Indicação discreta de modo de demonstração (quando o mock visual estiver ativo)
+        if (engine instanceof BlackjackMockSimulator) {
+            desenharIndicacaoDemonstracao(g, largura, altura);
+        }
     }
 
     private void desenharMesaFeltro(Graphics2D g, int largura, int altura) {
@@ -407,7 +412,22 @@ public class BlackjackTableView {
 
         // Botão de Voltar ao Salão (sempre visível no canto inferior)
         btnVoltar.setBounds(largura - 240, altura - 55, 200, 36);
-        desenharBotaoSecundario(g, btnVoltar, "VOLTAR AO SALÃO (ESC)");
+        desenharBotaoSecundario(g, btnVoltar, "VOLTAR AO SALÃO (B)");
+    }
+
+    private void desenharIndicacaoDemonstracao(Graphics2D g, int largura, int altura) {
+        String texto = "Modo de demonstração";
+        g.setFont(new Font("SansSerif", Font.PLAIN, 12));
+        FontMetrics fm = g.getFontMetrics();
+        int tw = fm.stringWidth(texto);
+
+        int x = 70;
+        int y = altura - 25;
+
+        g.setColor(new Color(0, 0, 0, 160));
+        g.fillRoundRect(x - 8, y - 14, tw + 16, 20, 6, 6);
+        g.setColor(new Color(255, 215, 0, 200));
+        g.drawString(texto, x, y);
     }
 
     private void desenharBotaoFicha(Graphics2D g, Rectangle r, String texto, Color corFundo) {
@@ -484,7 +504,7 @@ public class BlackjackTableView {
             } else if (btnFicha1000.contains(mx, my)) {
                 adicionarAposta(1000L);
             } else if (btnLimparAposta.contains(mx, my)) {
-                apostaPreparada = 20L; // Reinicia para aposta par mínima
+                apostaPreparada = 20L; // Reinicia para aposta par mínima permitida
             } else if (btnApostar.contains(mx, my)) {
                 acionarApostar();
             }
@@ -502,6 +522,10 @@ public class BlackjackTableView {
      * Trata atalhos de teclado na tela da mesa.
      */
     public boolean processarTecla(String comando) {
+        if ("VOLTAR".equals(comando) || "B".equals(comando)) {
+            return true;
+        }
+
         RoundState estado = engine.getEstadoRodada();
 
         if (estado == RoundState.AGUARDANDO_APOSTA || estado == RoundState.FINALIZADA) {
@@ -527,16 +551,51 @@ public class BlackjackTableView {
         return false;
     }
 
-    private void adicionarAposta(long valor) {
-        long novoValor = apostaPreparada + valor;
-        if (novoValor <= engine.getSaldoVirtual()) {
-            apostaPreparada = novoValor;
-        } else {
-            exibirAlerta("Saldo virtual insuficiente para aumentar a aposta!");
+    /**
+     * Incrementa o valor da aposta com verificação contra overflow de long e saldo disponível.
+     */
+    public void adicionarAposta(long valor) {
+        if (valor <= 0) {
+            exibirAlerta("Valor de ficha deve ser positivo!");
+            return;
+        }
+        try {
+            long novoValor = Math.addExact(apostaPreparada, valor);
+            if (novoValor > engine.getSaldoVirtual()) {
+                exibirAlerta("Saldo virtual insuficiente para aumentar a aposta!");
+                return;
+            }
+            this.apostaPreparada = novoValor;
+        } catch (ArithmeticException ex) {
+            exibirAlerta("O valor da aposta excede o limite numérico permitido!");
         }
     }
 
+    /**
+     * Define diretamente a aposta validando positividade, paridade e saldo.
+     */
+    public boolean setApostaPreparada(long novaAposta) {
+        if (novaAposta <= 0) {
+            exibirAlerta("A aposta deve ser estritamente maior que zero!");
+            return false;
+        }
+        if (novaAposta % 2 != 0) {
+            exibirAlerta("O valor da aposta deve ser par para permitir pagamento 3:2!");
+            return false;
+        }
+        if (novaAposta > engine.getSaldoVirtual()) {
+            exibirAlerta("Saldo virtual insuficiente para realizar esta aposta!");
+            return false;
+        }
+        this.apostaPreparada = novaAposta;
+        return true;
+    }
+
     private void acionarApostar() {
+        if (apostaPreparada <= 0) {
+            exibirAlerta("A aposta deve ser estritamente maior que zero!");
+            return;
+        }
         if (apostaPreparada % 2 != 0) {
             exibirAlerta("O valor da aposta deve ser par para permitir pagamento 3:2!");
             return;
@@ -552,9 +611,17 @@ public class BlackjackTableView {
         }
     }
 
-    private void exibirAlerta(String msg) {
+    public void exibirAlerta(String msg) {
         this.mensagemAlerta = msg;
         this.tempoAlerta = System.currentTimeMillis() + 3000;
+    }
+
+    public String getMensagemAlerta() {
+        return mensagemAlerta;
+    }
+
+    public long getApostaPreparada() {
+        return apostaPreparada;
     }
 
     public BlackjackEngine getEngine() {
