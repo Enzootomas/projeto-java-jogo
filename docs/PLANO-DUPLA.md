@@ -7,7 +7,7 @@ Tema confirmado: **Cassino Social 2D Isométrico (estilo Habbo)**. O jogador con
 | **1 — Base e POO [CONCLUÍDA]** | `MyShape`, `MyRectangle` e `MySquare` | `MyEllipse`, `MyCircle` e testes | Hierarquia compila; 32 testes automáticos passam; pilares explicados |
 | **2 — Salão Isométrico, Janela e Controles [CONCLUÍDA]** | `App` (tela cheia/ESC), loop (Timer 60 FPS com dt), projeção 2:1 e `IsometricHelper` | `ScreenSaver` (Key Bindings, z-sorting, mesa), `MyCharacter` (sprite PNG, som WAV, footprint) | Janela sem bordas em tela cheia, ESC encerra, movimento normalizado, colisão por eixos com deslizamento, 47 testes passando |
 | **3 — Mobília e Ambientação do Salão [CONCLUÍDA]** | `CasinoCounter` e `CasinoChair` (subclasses de `MyRectangle` com footprint sólido e Z-sorting) | Paredes isométricas, portal com letreiro, tapete decorativo e percurso validado | Salão ambientado com profundidade correta (frente/trás), colisões sólidas, caminho livre e 70 testes passando |
-| **4 — Mesa Interativa e Blackjack Solo [EM ANDAMENTO]** | Interface `BlackjackTableView` (cartas, fichas, atalhos, mock visual) | Motor de regras do Blackjack e ciclo de apostas (fichas virtuais) | Chegar perto da mesa abre o Blackjack; jogador aposta, pede carta/para e volta ao salão |
+| **4 — Mesas de Jogo e Interfaces [EM ANDAMENTO]** | Interface Blackjack, mesa de Truco e tela provisória (Enzo) | Motor de regras do Blackjack e ciclo de apostas (Colega) | Mesas identificadas no salão, seleção pela menor distância euclidiana, telas dedicadas com transição fluida |
 | **5 — Áudio, Polimento e Entrega** | Efeitos sonoros (`Clip` pré-carregado e rebobinado) | Revisão geral, remoção por laço reverso e testes na máquina da apresentação | Áudio sem travamentos; código compila via PowerShell/IDE; ensaio dos dois integrantes |
 
 ## Divisão de Frentes de Trabalho
@@ -90,6 +90,21 @@ public interface BlackjackEngine {
     int getPontosDealerVisiveis();
 }
 ```
+
+---
+
+## Expansão Multijogos no Salão: Mesa de Truco e Seleção Contextual
+
+Para enriquecer a ambientação do cassino e suportar futuros jogos, foi adicionada a **Mesa de Truco**:
+- **Reaproveitamento de `CasinoTable`:** a mesa utiliza a classe `CasinoTable` com `gameName = "Truco"`, base sólida $80 \times 50$ em $(320, 280)$ no setor sudeste do salão, garantindo ampla área de circulação e rotas desimpedidas entre Blackjack, balcão e descanso.
+- **Identificação Visual na Mesa:** renderização de letreiro/plaqueta estilizada acima da mesa indicando o jogo correspondente ("BLACKJACK" ou "TRUCO").
+- **Critério Unificado de Proximidade:**
+  - Se apenas uma mesa estiver no raio de alcance ($35\text{ px}$), ela se torna `mesaAtiva`.
+  - Se ambas estiverem ao alcance do avatar, o método `getDistanceSqToPlayer(player)` desempata selecionando deterministicamente a mesa com menor distância euclidiana ao quadrado.
+  - Se nenhuma estiver ao alcance, `mesaAtiva = null`, ocultando o balcão de interação e ignorando toques em `E`.
+- **Prompt Dinâmico:** o aviso exibe `E — Interagir com a mesa de [Jogo]`.
+- **Tela Provisória ("Truco em desenvolvimento"):** implementada em `GameState.MENU_TRUCO`, com painel de feltro azul marinho, moldura dourada, aviso em português, atalhos informativos e botão interativo de retorno ao salão (tecla `B` ou clique do mouse).
+- **Atalhos Globais:** `ESC` permanece encerrando a aplicação imediatamente em qualquer estado; `B` e `E` alternam entre a mesa e o salão.
 
 ---
 
