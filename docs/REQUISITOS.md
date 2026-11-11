@@ -18,11 +18,13 @@ Consolidar abstração, encapsulamento, herança e polimorfismo em um jogo 2D Ja
 - [x] Tecla ESC encerra o jogo imediatamente em qualquer estado.
 - [x] Setas e WASD com controle simultâneo de teclas pressionadas (Swing Key Bindings), normalização de vetor e diagonais fluidas.
 - [x] Salão isométrico renderizado por tiles com proporção 2:1 exata e ordenação de profundidade (z-sorting) pela base dos pés.
+- [x] Ambientação completa do salão: duas paredes isométricas ao fundo com molduras, portal de entrada com letreiro luminoso, tapete decorativo e caminho livre até a mesa.
+- [x] Mobília de cassino (`CasinoCounter` e `CasinoChair`) como subclasses de `MyRectangle` com footprint sólido no chão e renderização volumétrica.
 - [x] Colisão no plano do chão (*footprint* / base) calculada via `intersects(MyShape)` com deslizamento por eixos, sem usar o sprite vertical inteiro como obstáculo.
 - [x] Sprites PNG reais de avatar e ambiente carregados na memória antes do loop.
 - [x] Áudio WAV de interação pré-carregado com `Clip`, rebobinado (`setFramePosition(0)`) antes da reprodução e liberado no encerramento.
 - [x] Mesa interativa que detecta proximidade (`isPlayerNear`), exibe prompt e abre a tela de transição do Blackjack com botão para voltar ao salão.
-- [ ] Implementação completa das cartas e apostas do Blackjack solo (Etapa 4).
+- [ ] Implementação completa das cartas e apostas do Blackjack solo (Etapa 4 - Frente do colega).
 - [ ] Remoção de elementos por laço reverso em coleções dinâmicas de cartas/fichas.
 - [x] Código compila e executa por terminal PowerShell e IDE.
 - [x] README, diagrama Mermaid e histórico Git da dupla.
@@ -32,9 +34,11 @@ Consolidar abstração, encapsulamento, herança e polimorfismo em um jogo 2D Ja
 - `src/model/`:
   - `MyShape.java`, `MyRectangle.java`, `MySquare.java`, `MyEllipse.java`, `MyCircle.java` (Geometria e colisões da base).
   - `MyCharacter.java`: avatar do jogador que estende `MyShape`, contendo sprite, direção, animação e áudio.
-  - `CasinoTable.java` / `Obstacle.java`: mobílias e mesas do cassino com base de colisão e gatilho de interação.
+  - `CasinoTable.java`: mesa interativa de Blackjack com base de colisão e gatilho de proximidade.
+  - `CasinoCounter.java`: balcão do bar com footprint sólido e acabamento amadeirado.
+  - `CasinoChair.java`: cadeiras de cassino com footprint quadrado e estofamento vermelho bordô.
   - `BlackjackGame.java`: regras da partida solo contra o crupiê (fichas virtuais).
-- `src/view/ScreenSaver.java` (ou painel do cassino): renderização isométrica, z-sorting, loop do jogo (`Timer` a 60 FPS) e escuta de teclado.
+- `src/view/ScreenSaver.java` (ou painel do cassino): renderização isométrica, paredes, portal, tapete, z-sorting, loop do jogo (`Timer` a 60 FPS) e escuta de teclado.
 - `src/image/` e `src/sound/`: recursos gráficos (pixel art) e efeitos sonoros WAV.
 - `tests/TestePOO.java`: testes automatizados de lógica e POO.
 

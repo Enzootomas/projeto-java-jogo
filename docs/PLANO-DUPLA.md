@@ -6,8 +6,8 @@ Tema confirmado: **Cassino Social 2D Isométrico (estilo Habbo)**. O jogador con
 |---|---|---|---|
 | **1 — Base e POO [CONCLUÍDA]** | `MyShape`, `MyRectangle` e `MySquare` | `MyEllipse`, `MyCircle` e testes | Hierarquia compila; 32 testes automáticos passam; pilares explicados |
 | **2 — Salão Isométrico, Janela e Controles [CONCLUÍDA]** | `App` (tela cheia/ESC), loop (Timer 60 FPS com dt), projeção 2:1 e `IsometricHelper` | `ScreenSaver` (Key Bindings, z-sorting, mesa), `MyCharacter` (sprite PNG, som WAV, footprint) | Janela sem bordas em tela cheia, ESC encerra, movimento normalizado, colisão por eixos com deslizamento, 47 testes passando |
-| **3 — Mobília e NPCs do Salão** | Criação de novos obstáculos e balcões com footprints | Comportamento de perambulação simples de NPCs no salão | Salão mais vivo com novos elementos que respeitam z-sorting e colisões |
-| **4 — Mesa Interativa e Blackjack Solo** | Gatilho de interação com a mesa e interface de jogo | Motor de regras do Blackjack e ciclo de apostas (fichas virtuais) | Chegar perto da mesa abre o Blackjack; jogador aposta, pede carta/para e volta ao salão |
+| **3 — Mobília e Ambientação do Salão [CONCLUÍDA]** | `CasinoCounter` e `CasinoChair` (subclasses de `MyRectangle` com footprint sólido e Z-sorting) | Paredes isométricas, portal com letreiro, tapete decorativo e percurso validado | Salão ambientado com profundidade correta (frente/trás), colisões sólidas, caminho livre e 70 testes passando |
+| **4 — Mesa Interativa e Blackjack Solo [EM ANDAMENTO]** | Interface `BlackjackTableView` (cartas, fichas, atalhos, mock visual) | Motor de regras do Blackjack e ciclo de apostas (fichas virtuais) | Chegar perto da mesa abre o Blackjack; jogador aposta, pede carta/para e volta ao salão |
 | **5 — Áudio, Polimento e Entrega** | Efeitos sonoros (`Clip` pré-carregado e rebobinado) | Revisão geral, remoção por laço reverso e testes na máquina da apresentação | Áudio sem travamentos; código compila via PowerShell/IDE; ensaio dos dois integrantes |
 
 ## Divisão de Frentes de Trabalho
