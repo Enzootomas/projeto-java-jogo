@@ -13,6 +13,7 @@ import javax.swing.JComponent;
 import javax.swing.JPanel;
 import javax.swing.KeyStroke;
 import javax.swing.Timer;
+import model.BlackjackEngine;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Font;
@@ -24,6 +25,8 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.FocusAdapter;
 import java.awt.event.FocusEvent;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -37,7 +40,7 @@ import java.util.Set;
  * - Gerencia o loop de atualização (~60 FPS com delta time medido).
  * - Entrada contínua por Swing Key Bindings com limpeza ao perder foco.
  * - Renderização do salão isométrico e z-sorting por profundidade.
- * - Gerencia a transição entre o Salão e o Menu da Mesa de Blackjack.
+ * - Gerencia a transição entre o Salão e a Mesa de Blackjack interativa.
  * - Demonstra polimorfismo através de List<MyShape>.
  */
 public class ScreenSaver extends JPanel implements ActionListener {
@@ -58,6 +61,10 @@ public class ScreenSaver extends JPanel implements ActionListener {
     private CasinoTable mesaBlackjack;
     private List<MyShape> obstaculos;
     private List<MyShape> entidadesRenderizaveis;
+
+    // Interface e Motor do Blackjack
+    private BlackjackEngine blackjackEngine;
+    private BlackjackTableView blackjackTableView;
 
     // Loop e Tempo
     private Timer timer;
@@ -80,8 +87,10 @@ public class ScreenSaver extends JPanel implements ActionListener {
         setFocusable(true);
 
         inicializarEntidades();
+        configurarMesaBlackjack();
         configurarKeyBindings();
         configurarTratamentoFoco();
+        configurarMouseListener();
 
         this.lastTimeNano = System.nanoTime();
         this.timer = new Timer(16, this); // ~60 FPS
@@ -113,6 +122,31 @@ public class ScreenSaver extends JPanel implements ActionListener {
     }
 
     /**
+     * Inicializa a interface da mesa de Blackjack acoplada ao simulador/mock visual.
+     * O motor oficial de regras será fornecido pelo colega na classe BlackjackGame.
+     */
+    private void configurarMesaBlackjack() {
+        this.blackjackEngine = new BlackjackMockSimulator();
+        this.blackjackTableView = new BlackjackTableView(this.blackjackEngine);
+    }
+
+    private void configurarMouseListener() {
+        addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                if (estadoAtual == GameState.MENU_BLACKJACK && blackjackTableView != null) {
+                    boolean sairParaSalao = blackjackTableView.processarClique(e.getX(), e.getY());
+                    if (sairParaSalao) {
+                        player.playSound();
+                        estadoAtual = GameState.SALAO;
+                        teclasPressionadas.clear();
+                    }
+                }
+            }
+        });
+    }
+
+    /**
      * Configura Swing Key Bindings com WHEN_IN_FOCUSED_WINDOW.
      */
     private void configurarKeyBindings() {
@@ -122,14 +156,60 @@ public class ScreenSaver extends JPanel implements ActionListener {
         // Mapeamento de teclas direcionais (Pressionar e Soltar)
         vincularTecla(im, am, "W", "UP");
         vincularTecla(im, am, "UP", "UP");
-        vincularTecla(im, am, "S", "DOWN");
-        vincularTecla(im, am, "DOWN", "DOWN");
         vincularTecla(im, am, "A", "LEFT");
         vincularTecla(im, am, "LEFT", "LEFT");
         vincularTecla(im, am, "D", "RIGHT");
         vincularTecla(im, am, "RIGHT", "RIGHT");
+        vincularTecla(im, am, "DOWN", "DOWN");
 
-        // Tecla E para interação
+        // Tecla S: no salao move para baixo; na mesa de blackjack aciona PARAR (Stand)
+        im.put(KeyStroke.getKeyStroke("pressed S"), "press_S");
+        am.put("press_S", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                if (estadoAtual == GameState.SALAO) {
+                    teclasPressionadas.add("DOWN");
+                } else if (estadoAtual == GameState.MENU_BLACKJACK && blackjackTableView != null) {
+                    blackjackTableView.processarTecla("STAND");
+                }
+            }
+        });
+        im.put(KeyStroke.getKeyStroke("released S"), "rel_S");
+        am.put("rel_S", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                teclasPressionadas.remove("DOWN");
+            }
+        });
+
+        // Tecla H: Pedir Carta (Hit) na mesa
+        im.put(KeyStroke.getKeyStroke("pressed H"), "press_H");
+        am.put("press_H", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                if (estadoAtual == GameState.MENU_BLACKJACK && blackjackTableView != null) {
+                    blackjackTableView.processarTecla("HIT");
+                }
+            }
+        });
+
+        // Tecla ESPACO: Apostar e Jogar na mesa
+        im.put(KeyStroke.getKeyStroke("pressed SPACE"), "press_SPACE");
+        am.put("press_SPACE", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                if (estadoAtual == GameState.MENU_BLACKJACK && blackjackTableView != null) {
+                    blackjackTableView.processarTecla("ESPACO");
+                }
+            }
+        });
+
+        // Teclas numericas para selecao de fichas na mesa
+        configurarTeclaAtalhoMesa(im, am, "1", "FICHA_1");
+        configurarTeclaAtalhoMesa(im, am, "2", "FICHA_2");
+        configurarTeclaAtalhoMesa(im, am, "3", "FICHA_3");
+
+        // Tecla E para alternar interacao com a mesa
         im.put(KeyStroke.getKeyStroke("pressed E"), "acaoE");
         am.put("acaoE", new AbstractAction() {
             @Override
@@ -144,6 +224,18 @@ public class ScreenSaver extends JPanel implements ActionListener {
             @Override
             public void actionPerformed(ActionEvent e) {
                 encerrarJogo();
+            }
+        });
+    }
+
+    private void configurarTeclaAtalhoMesa(InputMap im, ActionMap am, String tecla, String comando) {
+        im.put(KeyStroke.getKeyStroke("pressed " + tecla), "press_" + comando);
+        am.put("press_" + comando, new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                if (estadoAtual == GameState.MENU_BLACKJACK && blackjackTableView != null) {
+                    blackjackTableView.processarTecla(comando);
+                }
             }
         });
     }
@@ -364,64 +456,31 @@ public class ScreenSaver extends JPanel implements ActionListener {
     }
 
     /**
-     * Renderiza o menu da mesa de Blackjack.
+     * Renderiza a interface completa da mesa de Blackjack.
      */
     private void desenharMenuBlackjack(Graphics2D g2d) {
-        int w = getWidth();
-        int h = getHeight();
+        if (blackjackTableView != null) {
+            blackjackTableView.render(g2d, getWidth(), getHeight());
+        }
+    }
 
-        // Fundo elegante de feltro de cassino
-        g2d.setColor(new Color(15, 60, 35));
-        g2d.fillRect(0, 0, w, h);
+    /**
+     * Permite conectar qualquer motor de Blackjack compativel com o contrato BlackjackEngine.
+     * Quando o colega finalizar a implementacao de BlackjackGame, basta injeta-la aqui.
+     */
+    public void setBlackjackEngine(BlackjackEngine engine) {
+        if (engine != null) {
+            this.blackjackEngine = engine;
+            this.blackjackTableView = new BlackjackTableView(engine);
+        }
+    }
 
-        // Painel central
-        int painelW = 600;
-        int painelH = 400;
-        int px = (w - painelW) / 2;
-        int py = (h - painelH) / 2;
+    public BlackjackEngine getBlackjackEngine() {
+        return blackjackEngine;
+    }
 
-        g2d.setColor(new Color(10, 25, 18, 240));
-        g2d.fillRoundRect(px, py, painelW, painelH, 20, 20);
-        g2d.setColor(new Color(212, 175, 55));
-        g2d.drawRoundRect(px, py, painelW, painelH, 20, 20);
-
-        g2d.setFont(new Font("SansSerif", Font.BOLD, 26));
-        g2d.setColor(new Color(255, 225, 100));
-        String titulo = "MESA DE BLACKJACK SOLO";
-        FontMetrics fm = g2d.getFontMetrics();
-        g2d.drawString(titulo, px + (painelW - fm.stringWidth(titulo)) / 2, py + 60);
-
-        g2d.setFont(new Font("SansSerif", Font.ITALIC, 16));
-        g2d.setColor(new Color(200, 230, 210));
-        String sub = "[ Em desenvolvimento para a Etapa 4 ]";
-        fm = g2d.getFontMetrics();
-        g2d.drawString(sub, px + (painelW - fm.stringWidth(sub)) / 2, py + 95);
-
-        g2d.setFont(new Font("SansSerif", Font.PLAIN, 15));
-        g2d.setColor(Color.WHITE);
-        g2d.drawString("• Modalidade: Jogador vs Crupiê (Modo Solo Offline)", px + 50, py + 150);
-        g2d.drawString("• Moeda: Fichas 100% virtuais (Saldo inicial: 50.000)", px + 50, py + 185);
-        g2d.drawString("• Regras: Baralho de 52 cartas, Blackjack 3:2, Parar no 17", px + 50, py + 220);
-        g2d.drawString("• Transicao de estado e gatilho de interacao funcionando!", px + 50, py + 255);
-
-        // Botão de retorno
-        g2d.setColor(new Color(40, 120, 60));
-        g2d.fillRoundRect(px + 150, py + 310, 300, 45, 12, 12);
-        g2d.setColor(new Color(255, 215, 0));
-        g2d.drawRoundRect(px + 150, py + 310, 300, 45, 12, 12);
-
-        g2d.setFont(new Font("SansSerif", Font.BOLD, 15));
-        g2d.setColor(Color.WHITE);
-        String voltar = "Pressione [ E ] para Voltar ao Salao";
-        fm = g2d.getFontMetrics();
-        g2d.drawString(voltar, px + (painelW - fm.stringWidth(voltar)) / 2, py + 338);
-
-        // Aviso do ESC
-        g2d.setFont(new Font("SansSerif", Font.PLAIN, 12));
-        g2d.setColor(new Color(200, 200, 200));
-        String escAviso = "(Pressione ESC a qualquer momento para fechar o jogo)";
-        fm = g2d.getFontMetrics();
-        g2d.drawString(escAviso, px + (painelW - fm.stringWidth(escAviso)) / 2, py + 380);
+    public BlackjackTableView getBlackjackTableView() {
+        return blackjackTableView;
     }
 
     public MyCharacter getPlayer() {
@@ -436,3 +495,4 @@ public class ScreenSaver extends JPanel implements ActionListener {
         return estadoAtual;
     }
 }
+
