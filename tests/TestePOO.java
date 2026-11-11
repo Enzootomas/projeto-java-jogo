@@ -57,6 +57,9 @@ public class TestePOO {
         // Testes da Etapa 3 (Mobília e Ambientação do Salão)
         testarColisaoEZSortingNovosMoveis();
 
+        // Testes da Etapa 4 (Mesa de Truco e Seleção de Proximidade)
+        testarMesaTrucoEDistanciaEuclidiana();
+
         System.out.println("\n----------------------------------------------------");
         System.out.println("Total de verificacoes: " + totalTestes);
         System.out.println("Falhas: " + falhas);
@@ -571,6 +574,58 @@ public class TestePOO {
         afirme(true, "draw(Graphics2D) de CasinoCounter e CasinoChair renderiza sem excecoes");
 
         avatar.dispose();
+        System.out.println();
+    }
+
+    private static void testarMesaTrucoEDistanciaEuclidiana() {
+        System.out.println("15. TESTE DA MESA DE TRUCO E CALCULO DE DISTANCIA EUCLIDIANA");
+
+        String spriteAvatar = "src/image/avatar.png";
+        String spriteMesa = "src/image/table.png";
+        String som = "src/sound/interact.wav";
+
+        // Cria mesa de Truco em (320, 280), footprint 80x50
+        CasinoTable mesaTruco = new CasinoTable(320, 280, 80, 50, spriteMesa, "Truco", 0, 0);
+        CasinoTable mesaBlackjack = new CasinoTable(160, 160, 80, 50, spriteMesa, "Blackjack", 0, 0);
+        MyCharacter player = new MyCharacter(spriteAvatar, 320, 340, 24, 24, som);
+
+        // 1. Identificacao e atributos
+        afirme("Truco".equals(mesaTruco.getGameName()), "Mesa de Truco possui gameName 'Truco'");
+        afirme(mesaTruco.getWidth() == 80 && mesaTruco.getHeight() == 50, "Mesa de Truco tem footprint 80x50");
+
+        // 2. Colisão física sólida com o player
+        player.setExactPosition(320, 280); // Sobreposto a mesa
+        afirme(mesaTruco.intersects(player), "Mesa de Truco detecta colisao de footprint com o jogador");
+
+        // 3. Cálculo de distância euclidiana ao quadrado (getDistanceSqToPlayer)
+        // Centro da mesa de Truco: cx = 320 + 40 = 360, cy = 280 + 25 = 305
+        // Player em (348, 293), centro do player: cx = 348 + 12 = 360, cy = 293 + 12 = 305 -> distSq = 0
+        player.setExactPosition(348, 293);
+        double distZero = mesaTruco.getDistanceSqToPlayer(player);
+        afirme(Math.abs(distZero) < 0.001, "getDistanceSqToPlayer retorna zero quando centros coincidem perfeitamente");
+
+        // 4. Seleção contextual de menor distância
+        // Posiciona player mais perto do Truco do que do Blackjack
+        player.setExactPosition(310, 270);
+        double distT = mesaTruco.getDistanceSqToPlayer(player);
+        double distB = mesaBlackjack.getDistanceSqToPlayer(player);
+        afirme(distT < distB, "Distancia ao Truco e estritamente menor do que ao Blackjack na posicao (310, 270)");
+
+        // Posiciona player mais perto do Blackjack
+        player.setExactPosition(170, 150);
+        distT = mesaTruco.getDistanceSqToPlayer(player);
+        distB = mesaBlackjack.getDistanceSqToPlayer(player);
+        afirme(distB < distT, "Distancia ao Blackjack e estritamente menor do que ao Truco na posicao (170, 150)");
+
+        // 5. Renderização e rótulo visual
+        BufferedImage img = new BufferedImage(300, 300, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g2 = img.createGraphics();
+        mesaTruco.updateOrigins(150, 100);
+        mesaTruco.draw(g2);
+        g2.dispose();
+        afirme(true, "draw(Graphics2D) de CasinoTable com rotulo visual executa sem erros");
+
+        player.dispose();
         System.out.println();
     }
 }

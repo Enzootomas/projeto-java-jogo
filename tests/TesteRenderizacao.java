@@ -124,6 +124,86 @@ public class TesteRenderizacao {
         afirme(!painel.getPlayer().intersects(painel.getBalcao()),
                 "Avatar navega ao Sul do balcao sem colisao ilegal");
 
+        // 8. Testes da Mesa de Truco, Trajeto Desimpedido e Selecao Contextual
+        afirme(painel.getMesaTruco() != null, "Mesa de Truco instanciada no salao");
+        afirme("Truco".equals(painel.getMesaTruco().getGameName()), "Mesa de Truco configurada com gameName 'Truco'");
+        afirme(painel.getObstaculos().contains(painel.getMesaTruco()),
+                "Mesa de Truco registrada na lista de obstaculos fisicos");
+        afirme(painel.getEntidadesRenderizaveis().contains(painel.getMesaTruco()),
+                "Mesa de Truco registrada na lista heterogenea de renderizacao");
+        afirme(!painel.getMesaBlackjack().intersects(painel.getMesaTruco()),
+                "Mesas de Blackjack e Truco possuem footprints fisicos independentes e sem sobreposicao");
+
+        // Trajeto livre entre Blackjack e Truco (posicoes intermediarias)
+        int[][] rotaLivre = {
+                {200, 210},
+                {240, 230},
+                {270, 250}
+        };
+        for (int[] ponto : rotaLivre) {
+            painel.getPlayer().setExactPosition(ponto[0], ponto[1]);
+            boolean colidiu = false;
+            for (model.MyShape obstaculo : painel.getObstaculos()) {
+                if (painel.getPlayer().intersects(obstaculo)) {
+                    colidiu = true;
+                    break;
+                }
+            }
+            afirme(!colidiu, "Ponto de passagem livre (" + ponto[0] + ", " + ponto[1] + ") sem bloqueio fisico");
+        }
+
+        // Cenário A: Longe de ambas as mesas -> mesaAtiva e nula e E nao abre nenhuma mesa
+        painel.getPlayer().setExactPosition(60, 320); // Entrada
+        painel.atualizarMesaMaisProxima();
+        afirme(painel.getMesaAtiva() == null, "Nenhuma mesa ativa quando o avatar esta distante de ambas");
+        painel.processarInteracaoE();
+        afirme(painel.getEstadoAtual() == view.ScreenSaver.GameState.SALAO,
+                "Pressionar E longe das mesas nao altera o estado do jogo (permanece SALAO)");
+
+        // Cenário B: Proximo a mesa de Blackjack -> mesaAtiva e Blackjack e E abre Blackjack
+        painel.getPlayer().setExactPosition(160, 125);
+        painel.atualizarMesaMaisProxima();
+        afirme(painel.getMesaAtiva() == painel.getMesaBlackjack(),
+                "Mesa ativa selecionada e Blackjack quando proximo a mesa de Blackjack");
+        painel.processarInteracaoE();
+        afirme(painel.getEstadoAtual() == view.ScreenSaver.GameState.MENU_BLACKJACK,
+                "Tecla E abre MENU_BLACKJACK quando mesa ativa e Blackjack");
+        painel.processarRetornoB();
+        afirme(painel.getEstadoAtual() == view.ScreenSaver.GameState.SALAO,
+                "Tecla B retorna com sucesso ao salao");
+
+        // Cenário C: Proximo a mesa de Truco -> mesaAtiva e Truco e E abre tela de Truco
+        painel.getPlayer().setExactPosition(320, 245);
+        painel.atualizarMesaMaisProxima();
+        afirme(painel.getMesaAtiva() == painel.getMesaTruco(),
+                "Mesa ativa selecionada e Truco quando proximo a mesa de Truco");
+        painel.processarInteracaoE();
+        afirme(painel.getEstadoAtual() == view.ScreenSaver.GameState.MENU_TRUCO,
+                "Tecla E abre MENU_TRUCO quando mesa ativa e Truco");
+
+        // Renderiza tela provisoria do Truco em buffer grafico
+        BufferedImage bufferTruco = new BufferedImage(largura, altura, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D gTruco = bufferTruco.createGraphics();
+        painel.paint(gTruco);
+        int pixelFeltroTruco = bufferTruco.getRGB(largura / 2, altura / 2);
+        afirme(pixelFeltroTruco != 0, "Tela provisoria de Truco renderizou com sucesso off-screen");
+        gTruco.dispose();
+
+        // Cenário D: Tecla B na tela de Truco retorna ao salao
+        painel.processarRetornoB();
+        afirme(painel.getEstadoAtual() == view.ScreenSaver.GameState.SALAO,
+                "Tecla B na tela de Truco retorna ao salao principal");
+
+        // Cenário E: Reabrir Truco e clicar no botao 'Voltar ao Salao (B)'
+        painel.setEstadoAtual(view.ScreenSaver.GameState.MENU_TRUCO);
+        afirme(painel.getEstadoAtual() == view.ScreenSaver.GameState.MENU_TRUCO,
+                "Transitou novamente para MENU_TRUCO");
+        int pyPainel = (altura - 500) / 2;
+        int centroBtnY = pyPainel + 500 - 85 + 24;
+        painel.processarCliqueMouse(largura / 2, centroBtnY);
+        afirme(painel.getEstadoAtual() == view.ScreenSaver.GameState.SALAO,
+                "Clique no botao 'Voltar ao Salao (B)' retorna ao salao com sucesso");
+
         g2d.dispose();
         gMesa.dispose();
         painel.pararLoop();

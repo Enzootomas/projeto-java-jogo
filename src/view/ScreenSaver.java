@@ -187,14 +187,14 @@ public class ScreenSaver extends JPanel implements ActionListener {
         } else if (estadoAtual == GameState.MENU_TRUCO) {
             int w = getWidth();
             int h = getHeight();
-            int painelW = Math.min(800, w - 80);
-            int painelH = Math.min(500, h - 80);
+            int painelW = Math.min(800, Math.max(400, w - 80));
+            int painelH = Math.min(500, Math.max(300, h - 80));
             int px = (w - painelW) / 2;
             int py = (h - painelH) / 2;
             int btnW = 260;
-            int btnH = 50;
+            int btnH = 48;
             int btnX = px + (painelW - btnW) / 2;
-            int btnY = py + painelH - 90;
+            int btnY = py + painelH - 85;
 
             if (x >= btnX && x <= btnX + btnW && y >= btnY && y <= btnY + btnH) {
                 processarRetornoB();
