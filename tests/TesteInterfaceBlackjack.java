@@ -36,6 +36,7 @@ public class TesteInterfaceBlackjack {
         System.out.println("====================================================\n");
 
         testarValidacoesApostaEOverflow();
+        testarControleTeclasFisicasIndependentes();
         testarPreservacaoRodadaAoAlternarTelas();
         testarInjecaoMotorAlternativo();
 
@@ -82,11 +83,53 @@ public class TesteInterfaceBlackjack {
                 "Adicao com overflow de long foi interceptada com seguranca sem alterar a aposta");
         afirme(view.getMensagemAlerta().contains("limite"),
                 "Mensagem de alerta sobre limite numerico foi exibida");
+
+        // Teste de Limpar Aposta e Bloqueio de Aposta Zero
+        view.limparAposta();
+        afirme(view.getApostaPreparada() == 0L, "Botao Limpar Aposta zerou a selecao (aposta = 0)");
+
+        boolean apostouZero = view.processarTecla("ESPACO");
+        afirme(mock.getEstadoRodada() == RoundState.AGUARDANDO_APOSTA,
+                "Tentativa de apostar zero foi bloqueada sem iniciar a rodada");
+        afirme(view.getMensagemAlerta().contains("maior que zero"),
+                "Alerta de aposta estritamente maior que zero foi exibido");
+
+        // Ficha adicionada após limpar recupera aposta válida
+        view.adicionarAposta(50L);
+        afirme(view.getApostaPreparada() == 50L, "Adicionar ficha de 50 apos limpar define aposta = 50");
+        System.out.println();
+    }
+
+    private static void testarControleTeclasFisicasIndependentes() {
+        System.out.println("2. Testando Controle Independente de Teclas Fisicas (W + Seta Cima):");
+
+        ScreenSaver painel = new ScreenSaver();
+
+        // 1. Pressiona W e UP simultaneamente
+        painel.simularPressionarTecla("W");
+        painel.simularPressionarTecla("UP");
+        afirme(painel.isMovendoParaCima(), "Segurando W + Seta UP: movimento para cima ativo");
+
+        // 2. Solta apenas W; a Seta UP continua pressionada
+        painel.simularSoltarTecla("W");
+        afirme(painel.isMovendoParaCima(), "Soltando W mas mantendo Seta UP: movimento para cima continua ativo!");
+
+        // 3. Solta a Seta UP; o movimento agora cessa
+        painel.simularSoltarTecla("UP");
+        afirme(!painel.isMovendoParaCima(), "Soltando Seta UP: movimento para cima cessou completamente");
+
+        // 4. Tecla S no salão move para baixo
+        painel.simularPressionarTecla("S");
+        afirme(painel.isMovendoParaBaixo(), "Tecla S no salao aciona movimento para baixo");
+        painel.simularSoltarTecla("S");
+        afirme(!painel.isMovendoParaBaixo(), "Soltar tecla S cessa movimento para baixo");
+
+        painel.pararLoop();
         System.out.println();
     }
 
     private static void testarPreservacaoRodadaAoAlternarTelas() {
-        System.out.println("2. Testando Preservacao de Rodada em Andamento ao Alternar Telas:");
+        System.out.println("3. Testando Preservacao de Rodada em Andamento ao Alternar Telas:");
 
         ScreenSaver painel = new ScreenSaver();
         BlackjackEngine motorOriginal = painel.getBlackjackEngine();
@@ -163,6 +206,16 @@ public class TesteInterfaceBlackjack {
         // Verifica que o mock antigo não recebeu chamadas
         afirme(mockAntigo.getEstadoRodada() == RoundState.AGUARDANDO_APOSTA,
                 "Mock antigo permaneceu isolado sem chamadas espúrias");
+
+        // Testa renderização do Salão (HUD) consultando o saldo do motor injetado
+        int chamadasAntesHUD = motorInjetado.chamadasGetSaldo;
+        painel.setSize(new Dimension(1000, 700));
+        BufferedImage bufferSalao = new BufferedImage(1000, 700, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D gSalao = bufferSalao.createGraphics();
+        painel.paint(gSalao);
+        gSalao.dispose();
+        afirme(motorInjetado.chamadasGetSaldo > chamadasAntesHUD,
+                "HUD do salao consultou diretamente o saldo do motor injetado (" + motorInjetado.getSaldoVirtual() + " fichas)");
 
         painel.pararLoop();
         System.out.println();

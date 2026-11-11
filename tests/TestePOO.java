@@ -49,6 +49,8 @@ public class TestePOO {
         testarColisaoDeslizamentoPorEixos();
         testarZSortingNosQuatroLadosDaMesa();
         testarConstrutoresEFootprintMyCharacter();
+        testarSincronizacaoPosicaoEColisaoMyCharacter();
+        testarCarregamentoClasspathERecursos();
 
         System.out.println("\n----------------------------------------------------");
         System.out.println("Total de verificacoes: " + totalTestes);
@@ -419,6 +421,72 @@ public class TestePOO {
 
         c1.dispose();
         c2.dispose();
+        System.out.println();
+    }
+
+    /**
+     * Teste 12: Sincronização de setX/setY com exactX/exactY e Colisão/Desenho após Reposicionamento.
+     */
+    private static void testarSincronizacaoPosicaoEColisaoMyCharacter() {
+        System.out.println("12. Testando Sincronizacao de setX/setY e Reposicionamento de MyCharacter:");
+
+        MyCharacter avatar = new MyCharacter(null, 50, 50, 24, 24, null);
+        afirme(avatar.getX() == 50 && avatar.getY() == 50, "Posicao inicial inteira (50, 50)");
+        afirme(avatar.getExactX() == 50.0 && avatar.getExactY() == 50.0, "Posicao inicial exata (50.0, 50.0)");
+
+        // Reposiciona via setters oficiais herdados de MyShape
+        avatar.setX(300);
+        avatar.setY(400);
+
+        afirme(avatar.getX() == 300 && avatar.getY() == 400, "getX() e getY() refletem novos valores (300, 400)");
+        afirme(avatar.getExactX() == 300.0 && avatar.getExactY() == 400.0,
+                "exactX e exactY foram sincronizados com setX/setY sem dessincronia");
+
+        // Verifica colisão após reposicionamento
+        MyRectangle obstaculoNovo = new MyRectangle(310, 410, 20, 20);
+        MyRectangle obstaculoAntigo = new MyRectangle(55, 55, 20, 20);
+
+        afirme(avatar.intersects(obstaculoNovo), "Avatar detecta colisao no novo local (300, 400)");
+        afirme(!avatar.intersects(obstaculoAntigo), "Avatar nao colide mais no local antigo (50, 50)");
+
+        // Teste de setExactPosition
+        avatar.setExactPosition(120.7, 180.2);
+        afirme(avatar.getExactX() == 120.7 && avatar.getExactY() == 180.2, "setExactPosition define double exato");
+        afirme(avatar.getX() == 121 && avatar.getY() == 180, "setExactPosition sincroniza inteiros arredondados");
+
+        // Teste de renderização após reposicionamento (off-screen)
+        java.awt.image.BufferedImage img = new java.awt.image.BufferedImage(400, 400, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g2 = img.createGraphics();
+        avatar.updateOrigins(200, 100);
+        avatar.draw(g2);
+        g2.dispose();
+        afirme(true, "draw(Graphics2D) renderiza sem excecoes apos reposicionamento");
+
+        avatar.dispose();
+        System.out.println();
+    }
+
+    /**
+     * Teste 13: Carregamento pelo Classpath e Gerenciamento de Recursos com try-with-resources.
+     */
+    private static void testarCarregamentoClasspathERecursos() {
+        System.out.println("13. Testando Carregamento pelo Classpath e ResourceLoader:");
+
+        // Pré-carregamento fora da EDT
+        model.ResourceLoader.precarregar();
+
+        java.awt.Image sprite = model.ResourceLoader.carregarImagem("src/image/avatar.png");
+        afirme(sprite != null, "ResourceLoader carrega imagem PNG via classpath ou arquivo");
+
+        java.awt.Image spriteCache = model.ResourceLoader.carregarImagem("src/image/avatar.png");
+        afirme(sprite == spriteCache, "ResourceLoader reaproveita imagem em cache sem releitura de disco");
+
+        javax.sound.sampled.Clip clip = model.ResourceLoader.carregarAudio("src/sound/interact.wav");
+        afirme(clip != null, "ResourceLoader carrega audio WAV com try-with-resources");
+        if (clip != null) {
+            clip.close();
+        }
+
         System.out.println();
     }
 }
