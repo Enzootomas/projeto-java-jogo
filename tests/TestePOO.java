@@ -1,5 +1,7 @@
 package tests;
 
+import model.CasinoCounter;
+import model.CasinoChair;
 import model.CasinoTable;
 import model.IsometricHelper;
 import model.MyCharacter;
@@ -51,6 +53,9 @@ public class TestePOO {
         testarConstrutoresEFootprintMyCharacter();
         testarSincronizacaoPosicaoEColisaoMyCharacter();
         testarCarregamentoClasspathERecursos();
+
+        // Testes da Etapa 3 (Mobília e Ambientação do Salão)
+        testarColisaoEZSortingNovosMoveis();
 
         System.out.println("\n----------------------------------------------------");
         System.out.println("Total de verificacoes: " + totalTestes);
@@ -489,4 +494,84 @@ public class TestePOO {
 
         System.out.println();
     }
+
+    /**
+     * Teste 14: Colisao, Deslizamento e Z-Sorting para CasinoCounter e CasinoChair.
+     */
+    private static void testarColisaoEZSortingNovosMoveis() {
+        System.out.println("14. Testando Colisao, Deslizamento e Z-Sorting para CasinoCounter e CasinoChair:");
+
+        double originX = 400.0;
+        double originY = 200.0;
+
+        // 1. Heranca e Polimorfismo: criacao e tipagem como MyShape / MyRectangle
+        CasinoCounter balcao = new CasinoCounter(100, 100, 80, 40, "BAR", originX, originY);
+        CasinoChair cadeira = new CasinoChair(250, 100, 20, originX, originY);
+
+        afirme(balcao instanceof MyRectangle && balcao instanceof MyShape,
+                "CasinoCounter eh uma subclasse valida de MyRectangle e MyShape");
+        afirme(cadeira instanceof MyRectangle && cadeira instanceof MyShape,
+                "CasinoChair eh uma subclasse valida de MyRectangle e MyShape");
+        afirme("BAR".equals(balcao.getRotulo()), "Rotulo do balcao preservado corretamente");
+
+        // 2. Colisao geometrica por intersects
+        MyCharacter avatar = new MyCharacter("src/image/avatar.png", 90, 95, 24, 24, "src/sound/interact.wav");
+        afirme(avatar.intersects(balcao), "Intersects detecta sobreposicao fisica do avatar com o balcao");
+
+        avatar.setExactPosition(255, 105);
+        afirme(avatar.intersects(cadeira), "Intersects detecta sobreposicao fisica do avatar com a cadeira");
+
+        // 3. Colisao e Deslizamento com moveIsometric contra novos moveis
+        List<MyShape> obstaculos = new ArrayList<>();
+        obstaculos.add(balcao);
+        obstaculos.add(cadeira);
+
+        // Posiciona avatar imediatamente a esquerda do balcao (x=75, balcao comeca em x=100)
+        avatar.setExactPosition(75, 105);
+        // Tenta mover para a direita na tela (dx > 0, dy > 0 em coordenadas de mundo)
+        // dirSx = 1.0 (para direita visual na tela: wx aumenta e wy diminui)
+        avatar.moveIsometric(1.0, 0.0, 100.0, 0.1, 512, 512, obstaculos);
+        afirme(!avatar.intersects(balcao),
+                "moveIsometric impede sobreposicao com o balcao atraves de colisao por eixos");
+
+        // 4. Z-Sorting Rigoroso com Ponto de Apoio (Norte vs Sul)
+        // Balcao: x=100..180, y=100..140. Centro do apoio = (140, 120)
+        balcao.updateOrigins(originX, originY);
+        avatar.updateOrigins(originX, originY);
+
+        // Avatar ao Norte do balcao (y=60): profundidade deve ser MENOR que o balcao (desenhado atras)
+        avatar.setExactPosition(130, 60);
+        afirme(avatar.getDepthZ() < balcao.getDepthZ(),
+                "Z-Sorting ao Norte do balcao: avatar desenhado atras do balcao (depthZ menor)");
+
+        // Avatar ao Sul do balcao (y=150): profundidade deve ser MAIOR que o balcao (desenhado na frente)
+        avatar.setExactPosition(130, 150);
+        afirme(avatar.getDepthZ() > balcao.getDepthZ(),
+                "Z-Sorting ao Sul do balcao: avatar desenhado a frente do balcao (depthZ maior)");
+
+        // Cadeira: x=250..270, y=100..120. Centro do apoio = (260, 110)
+        cadeira.updateOrigins(originX, originY);
+
+        // Avatar ao Norte da cadeira (y=65): desenhado atras
+        avatar.setExactPosition(248, 65);
+        afirme(avatar.getDepthZ() < cadeira.getDepthZ(),
+                "Z-Sorting ao Norte da cadeira: avatar desenhado atras da cadeira");
+
+        // Avatar ao Sul da cadeira (y=130): desenhado na frente
+        avatar.setExactPosition(248, 130);
+        afirme(avatar.getDepthZ() > cadeira.getDepthZ(),
+                "Z-Sorting ao Sul da cadeira: avatar desenhado a frente da cadeira");
+
+        // 5. Renderizacao polimorfica em buffer grafico offscreen
+        BufferedImage img = new BufferedImage(300, 300, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g2 = img.createGraphics();
+        balcao.draw(g2);
+        cadeira.draw(g2);
+        g2.dispose();
+        afirme(true, "draw(Graphics2D) de CasinoCounter e CasinoChair renderiza sem excecoes");
+
+        avatar.dispose();
+        System.out.println();
+    }
 }
+

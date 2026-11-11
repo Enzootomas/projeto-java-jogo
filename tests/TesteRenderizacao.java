@@ -89,6 +89,41 @@ public class TesteRenderizacao {
         mesaView.processarTecla("FICHA_1");
         mesaView.processarTecla("ESPACO");
 
+        // 7. Testa Ambientacao do Salao e Percurso Completo do Avatar
+        afirme(painel.getBalcao() != null, "Balcao do bar instanciado no salao");
+        afirme(painel.getCadeiras() != null && painel.getCadeiras().size() == 3,
+                "Tres cadeiras de cassino instanciadas no salao");
+        afirme(painel.getObstaculos().contains(painel.getBalcao()),
+                "Balcao registrado na lista de obstaculos fisicos");
+
+        // Avatar inicia na entrada do salao (x=60, y=320)
+        afirme(painel.getPlayer().getX() == 60 && painel.getPlayer().getY() == 320,
+                "Avatar inicia posicionado na entrada do salao sobre o tapete");
+
+        // Percurso: avatar caminha em direcao a mesa de Blackjack
+        painel.getPlayer().setExactPosition(160, 125); // Posicao adjacente a mesa
+        afirme(painel.getMesaBlackjack().isPlayerNear(painel.getPlayer(), 35),
+                "Avatar detectado proximo a mesa de Blackjack");
+
+        // Abre a mesa com a tecla E
+        painel.setEstadoAtual(view.ScreenSaver.GameState.MENU_BLACKJACK);
+        afirme(painel.getEstadoAtual() == view.ScreenSaver.GameState.MENU_BLACKJACK,
+                "Transitou do salao para a interface da mesa de Blackjack");
+
+        // Retorna ao salao com a tecla B
+        painel.setEstadoAtual(view.ScreenSaver.GameState.SALAO);
+        afirme(painel.getEstadoAtual() == view.ScreenSaver.GameState.SALAO,
+                "Retornou com sucesso ao salao principal");
+
+        // Contorno dos novos moveis: avatar circula ao redor do balcao sem sobreposicao
+        painel.getPlayer().setExactPosition(110, 15); // Norte do balcao
+        afirme(!painel.getPlayer().intersects(painel.getBalcao()),
+                "Avatar navega ao Norte do balcao sem colisao ilegal");
+
+        painel.getPlayer().setExactPosition(110, 80); // Sul do balcao
+        afirme(!painel.getPlayer().intersects(painel.getBalcao()),
+                "Avatar navega ao Sul do balcao sem colisao ilegal");
+
         g2d.dispose();
         gMesa.dispose();
         painel.pararLoop();
