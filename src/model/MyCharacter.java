@@ -64,30 +64,11 @@ public class MyCharacter extends MyShape {
     }
 
     private void carregarSprite(String imagePath) {
-        if (imagePath != null && !imagePath.isEmpty()) {
-            try {
-                this.sprite = ImageIO.read(new File(imagePath));
-            } catch (Exception e) {
-                System.err.println("Aviso: Nao foi possivel carregar o sprite do avatar em " + imagePath + " (" + e.getMessage() + ")");
-                this.sprite = null;
-            }
-        }
+        this.sprite = ResourceLoader.carregarImagem(imagePath);
     }
 
     private void carregarAudio(String soundPath) {
-        if (soundPath != null && !soundPath.isEmpty()) {
-            try {
-                File audioFile = new File(soundPath);
-                if (audioFile.exists()) {
-                    AudioInputStream ais = AudioSystem.getAudioInputStream(audioFile);
-                    this.collisionClip = AudioSystem.getClip();
-                    this.collisionClip.open(ais);
-                }
-            } catch (Exception e) {
-                System.err.println("Aviso: Nao foi possivel carregar o audio em " + soundPath + " (" + e.getMessage() + ")");
-                this.collisionClip = null;
-            }
-        }
+        this.collisionClip = ResourceLoader.carregarAudio(soundPath);
     }
 
     /**
@@ -285,6 +266,28 @@ public class MyCharacter extends MyShape {
             g.fillOval(screenFootX - 10, screenFootY - 45, 20, 20); // cabeça
             g.fillRect(screenFootX - 8, screenFootY - 25, 16, 25);  // corpo
         }
+    }
+
+    @Override
+    public void setX(int x) {
+        super.setX(x);
+        this.exactX = x;
+    }
+
+    @Override
+    public void setY(int y) {
+        super.setY(y);
+        this.exactY = y;
+    }
+
+    /**
+     * Define a posição contínua em double e sincroniza com os valores inteiros herdados.
+     */
+    public void setExactPosition(double x, double y) {
+        this.exactX = x;
+        this.exactY = y;
+        this.x = (int) Math.round(x);
+        this.y = (int) Math.round(y);
     }
 
     public double getExactX() {
