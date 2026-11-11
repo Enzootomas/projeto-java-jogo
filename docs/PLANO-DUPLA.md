@@ -21,13 +21,52 @@ O desenvolvimento segue dividido em duas frentes complementares e independentes:
    * Baralho de 52 cartas, distribuição, cálculo de pontuação (Ás como 1 ou 11), mãos do jogador e do dealer, inteligência do dealer (parar no 17), ciclo de apostas e gestão de saldo de fichas virtuais.
    * Branches de trabalho: `feat/regras-<tarefa>`
 
-Ambos trabalham em seus respectivos computadores, com suas próprias contas Git. **Nenhum integrante faz commit ou push diretamente na branch `main`**. O colega iniciará seus trabalhos puxando a branch compartilhada `feat/base-cassino`.
+Ambos trabalham em seus respectivos computadores, com suas próprias contas Git. **Nenhum integrante faz commit ou push diretamente na branch `main`**. O colega iniciará seus trabalhos puxando a branch compartilhada `feat/regras-contrato`.
 
 ---
 
-## Contrato de Integração: Interface (View) $\leftrightarrow$ Motor de Regras (Model)
+## Contrato de Integração Oficial: Interface (View) $\leftrightarrow$ Motor de Regras (Model)
 
-Para garantir que o colega possa desenvolver o motor do Blackjack e Enzo possa desenvolver a interface da mesa sem dependência mútua, definimos o seguinte contrato conceitual simples em Java:
+Para garantir que o colega possa desenvolver o motor do Blackjack e Enzo possa desenvolver a interface da mesa sem acoplamento ou vazamento de segredos, formalizamos a interface `BlackjackEngine` e seus tipos de suporte:
+
+### 1. Tipos de Apoio
+- **`Suit` (Enum):** `COPAS`, `ESPADAS`, `OUROS`, `PAUS` (com símbolo e nome em português).
+- **`Rank` (Enum):** `AS` a `REI` (valores de Blackjack 2 a 10, figuras valendo 10 e Ás valendo 11 ou 1).
+- **`Card` (Classe Imutável):** representa a carta com naipe e valor, com formatação para apresentação textual e visual.
+- **`RoundState` (Enum):** estados explícitos da rodada:
+  - `AGUARDANDO_APOSTA`: início ou entre rodadas.
+  - `TURNO_JOGADOR`: cartas distribuídas, dealer com 1 carta visível e 1 oculta virada para baixo.
+  - `FINALIZADA`: desfecho apurado, carta oculta revelada e saldo liquidado.
+- **`RoundResult` (Enum):** resultados com liquidação matemática:
+  - `EM_ANDAMENTO`: rodada ativa.
+  - `JOGADOR_BLACKJACK`: vitória com 21 natural. Paga **3:2** sobre a aposta.
+  - `JOGADOR_VITORIA`: pontuação maior que dealer ou dealer estourou. Paga **1:1**.
+  - `EMPATE_PUSH`: empate na pontuação final. Devolve a aposta original integralmente.
+  - `JOGADOR_ESTOUROU` / `DEALER_VITORIA` / `DEALER_BLACKJACK`: derrota do jogador (retorno 0).
+
+### 2. Regras Financeiras e Pagamento 3:2 sem Arredondamento
+- **Fichas Virtuais em `long`:** saldo e apostas utilizam o tipo primitivo `long` para suportar grandes volumes sem risco de overflow.
+- **Regra da Aposta Par:** para garantir que o pagamento padrão de Blackjack 3:2 seja efetuado por divisão inteira exata sem truncamento ou centavos perdidos:
+  $$\text{Retorno} = \text{aposta} + \frac{\text{aposta} \times 3}{2}$$
+  O método `iniciarPartida(long valorAposta)` **aceita exclusivamente valores estritamente positivos e pares** (`valorAposta % 2 == 0`). Apostas ímpares devem ser rejeitadas retornando `false`.
+- **Liquidação Única:** a aposta é debitada do saldo no momento em que `iniciarPartida` é chamado. O crédito do prêmio é processado **exatamente uma única vez** no momento da transição para o estado `FINALIZADA`.
+
+### 3. Visibilidade Segura e Proteção contra Vazamento de Cartas
+- Durante o `TURNO_JOGADOR`, a interface precisa saber que há uma segunda carta na mesa virada para baixo, mas **não pode ter acesso à carta oculta** antes da sua revelação:
+  - `getCartasVisiveisDealer()` retorna apenas a primeira carta visível durante o turno do jogador.
+  - `hasCartaOcultaDealer()` retorna `true` durante o turno do jogador, permitindo à View desenhar o verso da carta.
+  - Somente após o jogador parar (`parar()`) ou a rodada transitar para `FINALIZADA`, `getCartasVisiveisDealer()` passa a retornar todas as cartas da banca e `hasCartaOcultaDealer()` passa a retornar `false`.
+- **Imutabilidade:** tanto `getMaoJogador()` quanto `getCartasVisiveisDealer()` retornam listas protegidas por `Collections.unmodifiableList`, impedindo que a interface modifique as coleções internas do motor.
+
+### 4. Matriz de Ações Permitidas por Estado
+
+| Ação | `AGUARDANDO_APOSTA` | `TURNO_JOGADOR` | `FINALIZADA` |
+|---|---|---|---|
+| `iniciarPartida(valorAposta)` | **Permitido** (deve ser par e $\le$ saldo) | **Proibido** (retorna `false`) | **Permitido** (inicia nova rodada) |
+| `pedirCarta()` (Hit) | **Proibido** (retorna `false`) | **Permitido** (se estourar $\to$ `FINALIZADA`) | **Proibido** (retorna `false`) |
+| `parar()` (Stand) | **Proibido** (sem efeito) | **Permitido** (dealer joga $\to$ `FINALIZADA`) | **Proibido** (sem efeito) |
+
+### 5. Código da Interface `BlackjackEngine`
 
 ```java
 package model;
@@ -35,35 +74,32 @@ package model;
 import java.util.List;
 
 public interface BlackjackEngine {
-    // Ações do Jogador
-    boolean iniciarPartida(int valorAposta);
-    boolean pedirCarta(); // Hit
-    void parar();         // Stand
+    boolean iniciarPartida(long valorAposta);
+    boolean pedirCarta();
+    void parar();
 
-    // Consultas de Estado para a Interface (View)
-    int getSaldoVirtual();
-    int getApostaAtual();
+    long getSaldoVirtual();
+    long getApostaAtual();
+    RoundState getEstadoRodada();
+    RoundResult getResultadoRodada();
+
     List<Card> getMaoJogador();
-    List<Card> getMaoDealer();
+    List<Card> getCartasVisiveisDealer();
+    boolean hasCartaOcultaDealer();
     int getPontosJogador();
     int getPontosDealerVisiveis();
-    boolean isRodadaFinalizada();
-    String getResultadoTexto(); // "Jogador Venceu", "Dealer Venceu", "Empate", etc.
 }
 ```
-
-* O colega implementará as classes de regras (`Card`, `Deck`, `Hand`, `BlackjackGame implements BlackjackEngine`).
-* A interface (`ScreenSaver` / tela de Blackjack) apenas consultará esses métodos para desenhar as cartas e processar os botões de ação.
 
 ---
 
 ## Fluxo Git da Dupla
 
-1. **Branch Base Compartilhada:** `feat/base-cassino` (contém o salão isométrico, hierarquia de formas, avatar, assets e testes das Etapas 1 e 2).
+1. **Branch de Contrato Compartilhada:** `feat/regras-contrato` (contém o contrato oficial compilado, tipos de dados imutáveis e testes automatizados).
 2. **Para o Colega Iniciar:**
    ```bash
    git fetch origin
-   git checkout feat/base-cassino
+   git checkout feat/regras-contrato
    git checkout -b feat/regras-<nome-da-tarefa>
    ```
 3. **Padrão Obrigatório de Commits:**
