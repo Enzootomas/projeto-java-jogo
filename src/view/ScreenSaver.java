@@ -134,16 +134,23 @@ public class ScreenSaver extends JPanel implements ActionListener {
         addMouseListener(new MouseAdapter() {
             @Override
             public void mouseClicked(MouseEvent e) {
-                if (estadoAtual == GameState.MENU_BLACKJACK && blackjackTableView != null) {
-                    boolean sairParaSalao = blackjackTableView.processarClique(e.getX(), e.getY());
-                    if (sairParaSalao) {
-                        player.playSound();
-                        estadoAtual = GameState.SALAO;
-                        teclasPressionadas.clear();
-                    }
-                }
+                processarCliqueMouse(e.getX(), e.getY());
             }
         });
+    }
+
+    /**
+     * Processa cliques do mouse na tela.
+     */
+    public void processarCliqueMouse(int x, int y) {
+        if (estadoAtual == GameState.MENU_BLACKJACK && blackjackTableView != null) {
+            boolean sairParaSalao = blackjackTableView.processarClique(x, y);
+            if (sairParaSalao) {
+                player.playSound();
+                estadoAtual = GameState.SALAO;
+                teclasPressionadas.clear();
+            }
+        }
     }
 
     /**
@@ -209,6 +216,19 @@ public class ScreenSaver extends JPanel implements ActionListener {
         configurarTeclaAtalhoMesa(im, am, "2", "FICHA_2");
         configurarTeclaAtalhoMesa(im, am, "3", "FICHA_3");
 
+        // Tecla B para retornar ao salao a partir da mesa de Blackjack
+        im.put(KeyStroke.getKeyStroke("pressed B"), "acaoB");
+        am.put("acaoB", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                if (estadoAtual == GameState.MENU_BLACKJACK) {
+                    player.playSound();
+                    estadoAtual = GameState.SALAO;
+                    teclasPressionadas.clear();
+                }
+            }
+        });
+
         // Tecla E para alternar interacao com a mesa
         im.put(KeyStroke.getKeyStroke("pressed E"), "acaoE");
         am.put("acaoE", new AbstractAction() {
@@ -245,7 +265,9 @@ public class ScreenSaver extends JPanel implements ActionListener {
         am.put("press_" + comando, new AbstractAction() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                teclasPressionadas.add(comando);
+                if (estadoAtual == GameState.SALAO) {
+                    teclasPressionadas.add(comando);
+                }
             }
         });
 
@@ -285,15 +307,22 @@ public class ScreenSaver extends JPanel implements ActionListener {
     }
 
     /**
-     * Encerra a aplicação de forma limpa, liberando recursos de áudio.
+     * Para o timer e libera recursos de áudio sem encerrar a JVM (ideal para testes).
      */
-    public void encerrarJogo() {
+    public void pararLoop() {
         if (timer != null && timer.isRunning()) {
             timer.stop();
         }
         if (player != null) {
             player.dispose();
         }
+    }
+
+    /**
+     * Encerra a aplicação de forma limpa, liberando recursos de áudio.
+     */
+    public void encerrarJogo() {
+        pararLoop();
         System.exit(0);
     }
 
@@ -493,6 +522,17 @@ public class ScreenSaver extends JPanel implements ActionListener {
 
     public GameState getEstadoAtual() {
         return estadoAtual;
+    }
+
+    public void setEstadoAtual(GameState novoEstado) {
+        this.estadoAtual = novoEstado;
+        this.teclasPressionadas.clear();
+    }
+
+    public void processarComandoMesa(String comando) {
+        if (estadoAtual == GameState.MENU_BLACKJACK && blackjackTableView != null) {
+            blackjackTableView.processarTecla(comando);
+        }
     }
 }
 
