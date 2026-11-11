@@ -43,14 +43,7 @@ public class CasinoTable extends MyRectangle {
         this.originX = originX;
         this.originY = originY;
 
-        if (imagePath != null && !imagePath.isEmpty()) {
-            try {
-                this.sprite = ImageIO.read(new File(imagePath));
-            } catch (IOException e) {
-                System.err.println("Aviso: Nao foi possivel carregar o sprite da mesa em " + imagePath);
-                this.sprite = null;
-            }
-        }
+        this.sprite = ResourceLoader.carregarImagem(imagePath);
     }
 
     public void updateOrigins(double originX, double originY) {

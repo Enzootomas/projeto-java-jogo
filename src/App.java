@@ -17,6 +17,9 @@ import java.awt.Toolkit;
 public class App {
 
     public static void main(String[] args) {
+        // Pré-carregamento de imagens e áudio realizado FORA da EDT do Swing
+        model.ResourceLoader.precarregar();
+
         SwingUtilities.invokeLater(() -> {
             JFrame frame = new JFrame("Cassino Social 2D - Habbo Style");
             frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
