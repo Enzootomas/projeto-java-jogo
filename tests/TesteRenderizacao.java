@@ -91,7 +91,7 @@ public class TesteRenderizacao {
 
         g2d.dispose();
         gMesa.dispose();
-        painel.encerrarJogo();
+        painel.pararLoop();
 
         System.out.println("\n----------------------------------------------------");
         System.out.println("RESULTADO: TODOS OS TESTES DE RENDERIZACAO PASSARAM! [OK]");
