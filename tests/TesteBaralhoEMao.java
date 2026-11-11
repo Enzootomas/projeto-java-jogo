@@ -68,7 +68,13 @@ public class TesteBaralhoEMao {
     }
 
     private static void testarIntegridadeBaralhoPadrao() {
-        System.out.println("1. Testando Integridade do Baralho Padrao (52 Cartas Unicas):");
+        System.out.println("1. Testando Integridade do Baralho Padrao de Producao (SecureRandom, 52 Cartas Unicas):");
+
+        Deck deckProducao = new Deck();
+        afirme(deckProducao.cartasRestantes() == 52, "Deck() de producao (SecureRandom) inicia com 52 cartas");
+        deckProducao.embaralhar();
+        afirme(new HashSet<>(deckProducao.getCartasRestantesSnapshot()).size() == 52,
+                "Deck() de producao preserva 52 cartas distintas apos embaralhar com SecureRandom");
 
         Deck deck = new Deck(new Random(42L));
         afirme(deck.cartasRestantes() == 52, "Deck padrao inicia com exatamente 52 cartas");

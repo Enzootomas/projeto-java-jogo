@@ -1,5 +1,6 @@
 package model;
 
+import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -17,12 +18,13 @@ import java.util.Random;
  *       ({@link #comprarCarta()}, {@link #embaralhar()}, {@link #reiniciarBaralhoPadrao()})
  *       ocultando a estrutura interna da pilha de cartas.</li>
  *   <li><strong>Encapsulamento:</strong> a lista interna {@code cartas} e privada; consultas
- *       retornam snapshots imutaveis via {@link List#copyOf(Collection)} e remocoes
- *       ocorrem pelo final da lista (laco reverso / topo no ultimo indice), evitando
- *       deslocamentos desnecessarios e impedindo adulteracao externa.</li>
- *   <li><strong>Testabilidade Deterministica (Sobrecarga de Construtores):</strong> permite
- *       instanciar tanto um baralho padrao de 52 cartas (com {@link Random} padrao ou semente
- *       controlada) quanto um baralho com sequencia fixa de cartas para testes automatizados.</li>
+ *       retornam snapshots imutaveis via {@link List#copyOf(Collection)} e a compra de uma
+ *       carta remove diretamente do topo (ultimo indice da lista), usando laco reverso quando
+ *       precisa remover elementos iterando por indice (como em {@link #limparComLacoReverso()}).</li>
+ *   <li><strong>Polimorfismo por Subtipagem ({@link SecureRandom} extends {@link Random}):</strong>
+ *       em producao utiliza {@link SecureRandom} para embaralhamento criptograficamente forte,
+ *       enquanto aceita qualquer {@link Random} com semente fixa ou sequencia deterministica
+ *       nos construtores voltados a testes automatizados.</li>
  * </ul>
  */
 public class Deck {
@@ -34,11 +36,11 @@ public class Deck {
     private final Random random;
 
     /**
-     * Cria um baralho padrao completo com as 52 cartas (sem embaralhar automaticamente,
-     * permitindo inspecao deterministica ou chamada explicita a {@link #embaralhar()}).
+     * Cria um baralho padrao completo com as 52 cartas utilizando {@link SecureRandom}
+     * como fonte de aleatoriedade de producao.
      */
     public Deck() {
-        this(new Random());
+        this(new SecureRandom());
     }
 
     /**
@@ -66,7 +68,7 @@ public class Deck {
      * @param sequenciaTopoParaBase lista de cartas na ordem de compra (nao pode ser nula nem conter nulos).
      */
     public Deck(List<Card> sequenciaTopoParaBase) {
-        this(sequenciaTopoParaBase, new Random());
+        this(sequenciaTopoParaBase, new SecureRandom());
     }
 
     /**
