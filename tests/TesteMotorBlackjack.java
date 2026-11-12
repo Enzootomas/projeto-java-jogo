@@ -45,6 +45,7 @@ public class TesteMotorBlackjack {
         testarEstouroDoJogadorEDoDealer();
         testarVitoriaDerrotaEmpateEPagamentoUnicoSemDuplicidade();
         testarMultiplasRodadasConsecutivasEModoProducao();
+        testarBaralhoInjetadoDeterministicoSemReposicaoAleatoria();
 
         System.out.println("\n----------------------------------------------------");
         System.out.println("Total de verificacoes (BlackjackGame): " + totalTestes);
@@ -439,6 +440,83 @@ public class TesteMotorBlackjack {
                 "Construtor padrao inicializa com 50.000 fichas virtuais");
         afirme(gameProducao.iniciarPartida(200L),
                 "Construtor padrao de producao inicia partida real embaralhada com sucesso");
+        System.out.println();
+    }
+
+    private static void testarBaralhoInjetadoDeterministicoSemReposicaoAleatoria() {
+        System.out.println("10. Testando Determinismo Estrito do Baralho Injetado (< 4 Cartas e Esgotamento na Rodada):");
+
+        // Caso 1: Menos de 4 cartas antes de iniciarPartida -> deve retornar false sem debitar saldo nem repor cartas
+        Deck deckComTresCartas = new Deck(List.of(
+                c(Suit.COPAS, Rank.DEZ),
+                c(Suit.ESPADAS, Rank.SETE),
+                c(Suit.OUROS, Rank.CINCO)
+        ));
+        BlackjackGame gamePoucasCartas = new BlackjackGame(1000L, deckComTresCartas);
+        afirme(!gamePoucasCartas.iniciarPartida(100L),
+                "iniciarPartida() retorna false quando baralho injetado possui menos de 4 cartas (3)");
+        afirme(gamePoucasCartas.getSaldoVirtual() == 1000L
+                        && gamePoucasCartas.getEstadoRodada() == RoundState.AGUARDANDO_APOSTA,
+                "Saldo (1000) e estado (AGUARDANDO_APOSTA) permanecem intactos quando faltam cartas para distribuir");
+        afirme(deckComTresCartas.cartasRestantes() == 3,
+                "Baralho injetado nao foi reiniciado nem consumido ao recusar inicio com menos de 4 cartas");
+
+        // Subcaso 1b: Apos uma 1a rodada consumir 4 de 6 cartas, restam 2 -> 2a rodada deve ser recusada com false
+        Deck deckSeisCartas = new Deck(List.of(
+                c(Suit.COPAS, Rank.DEZ),      // R1 Jogador 1
+                c(Suit.ESPADAS, Rank.DEZ),    // R1 Dealer aberta
+                c(Suit.OUROS, Rank.NOVE),     // R1 Jogador 2 (19)
+                c(Suit.PAUS, Rank.OITO),      // R1 Dealer oculta (18)
+                c(Suit.COPAS, Rank.DOIS),     // Sobra 1
+                c(Suit.OUROS, Rank.TRES)      // Sobra 2
+        ));
+        BlackjackGame gameSegundaSemCartas = new BlackjackGame(1000L, deckSeisCartas);
+        afirme(gameSegundaSemCartas.iniciarPartida(100L), "1a rodada inicia normalmente com 6 cartas no deck");
+        gameSegundaSemCartas.parar(); // Saldo = 1100, restam apenas 2 cartas no deck injetado
+        afirme(!gameSegundaSemCartas.iniciarPartida(100L),
+                "2a rodada retorna false quando restam apenas 2 cartas no baralho injetado (sem reembaralhar)");
+        afirme(gameSegundaSemCartas.getSaldoVirtual() == 1100L && deckSeisCartas.cartasRestantes() == 2,
+                "Saldo apos R1 (1100) e as 2 cartas restantes permanecem intactos");
+
+        // Caso 2a: Esgotamento durante pedirCarta() do jogador -> sinaliza IllegalStateException sem repor cartas
+        Deck deckQuatroCartasParaHit = new Deck(List.of(
+                c(Suit.COPAS, Rank.CINCO),    // Jogador 1
+                c(Suit.ESPADAS, Rank.SETE),   // Dealer aberta
+                c(Suit.OUROS, Rank.SEIS),     // Jogador 2 (11)
+                c(Suit.PAUS, Rank.DEZ)        // Dealer oculta (17) -> 0 cartas restantes!
+        ));
+        BlackjackGame gameEsgotaNoHit = new BlackjackGame(1000L, deckQuatroCartasParaHit);
+        afirme(gameEsgotaNoHit.iniciarPartida(100L), "Inicia partida com exatas 4 cartas");
+        boolean sinalizouEsgotamentoNoHit = false;
+        try {
+            gameEsgotaNoHit.pedirCarta();
+        } catch (IllegalStateException e) {
+            sinalizouEsgotamentoNoHit = true;
+        }
+        afirme(sinalizouEsgotamentoNoHit,
+                "pedirCarta() com baralho injetado esgotado lanca IllegalStateException explicita (sem repor cartas aleatorias)");
+        afirme(deckQuatroCartasParaHit.estaVazio(),
+                "Baralho injetado permanece vazio (0 cartas), comprovando ausencia de reposicao aleatoria");
+
+        // Caso 2b: Esgotamento durante compras obrigatorias do dealer em parar() -> sinaliza IllegalStateException
+        Deck deckQuatroCartasDealerPrecisaComprar = new Deck(List.of(
+                c(Suit.COPAS, Rank.DEZ),      // Jogador 1
+                c(Suit.ESPADAS, Rank.SEIS),   // Dealer aberta (6)
+                c(Suit.OUROS, Rank.OITO),     // Jogador 2 (18)
+                c(Suit.PAUS, Rank.NOVE)       // Dealer oculta (9 -> soma 15 < 17, precisara comprar mas deck acabou!)
+        ));
+        BlackjackGame gameEsgotaNoDealer = new BlackjackGame(1000L, deckQuatroCartasDealerPrecisaComprar);
+        afirme(gameEsgotaNoDealer.iniciarPartida(100L), "Inicia partida em que dealer precisara comprar alem da 4a carta");
+        boolean sinalizouEsgotamentoNoTurnoDealer = false;
+        try {
+            gameEsgotaNoDealer.parar();
+        } catch (IllegalStateException e) {
+            sinalizouEsgotamentoNoTurnoDealer = true;
+        }
+        afirme(sinalizouEsgotamentoNoTurnoDealer,
+                "parar() com dealer < 17 e baralho injetado esgotado lanca IllegalStateException explicita");
+        afirme(deckQuatroCartasDealerPrecisaComprar.estaVazio(),
+                "Baralho injetado permanece vazio apos falha explicita no turno do dealer");
         System.out.println();
     }
 }
