@@ -188,10 +188,11 @@ public class TrucoRound {
             throw new IllegalArgumentException("A carta " + carta + " não está na mão do jogador ou já foi jogada.");
         }
 
-        // Remove da mão e registra na vaza atual
+        // Remove da mão e registra na vaza atual através de nova instância imutável
         maoJogador.remove(carta);
         TrucoTrick vaza = getVazaAtual();
-        vaza.registrarJogada(TrucoPlayer.JOGADOR, carta);
+        TrucoTrick vazaAtualizada = vaza.comJogada(TrucoPlayer.JOGADOR, carta);
+        vazas.set(vazas.size() - 1, vazaAtualizada);
 
         processarAposJogada();
     }
@@ -217,7 +218,8 @@ public class TrucoRound {
         Card cartaEscolhida = botAI.escolherCarta(maoBot, vira, cartaPublicaAdversario);
 
         maoBot.remove(cartaEscolhida);
-        vaza.registrarJogada(TrucoPlayer.BOT, cartaEscolhida);
+        TrucoTrick vazaAtualizada = vaza.comJogada(TrucoPlayer.BOT, cartaEscolhida);
+        vazas.set(vazas.size() - 1, vazaAtualizada);
 
         processarAposJogada();
     }
