@@ -19,6 +19,9 @@ import javax.swing.JPanel;
 import javax.swing.KeyStroke;
 import javax.swing.Timer;
 import model.BlackjackEngine;
+import model.TrucoDeck;
+import model.TrucoPlayer;
+import model.TrucoRound;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Font;
@@ -76,6 +79,11 @@ public class ScreenSaver extends JPanel implements ActionListener {
     private BlackjackEngine blackjackEngine;
     private BlackjackTableView blackjackTableView;
 
+    // Interface e Motor do Truco Paulista
+    private TrucoRound trucoRound;
+    private TrucoTableView trucoTableView;
+    private TrucoPlayer proximoPrimeiroDaMao = TrucoPlayer.JOGADOR;
+
     // Loop e Tempo
     private Timer timer;
     private long lastTimeNano;
@@ -98,6 +106,7 @@ public class ScreenSaver extends JPanel implements ActionListener {
 
         inicializarEntidades();
         configurarMesaBlackjack();
+        configurarMesaTruco();
         configurarKeyBindings();
         configurarTratamentoFoco();
         configurarMouseListener();
@@ -166,6 +175,14 @@ public class ScreenSaver extends JPanel implements ActionListener {
         this.blackjackTableView = new BlackjackTableView(this.blackjackEngine);
     }
 
+    /**
+     * Inicializa a interface da mesa de Truco acoplada ao motor oficial TrucoRound.
+     */
+    private void configurarMesaTruco() {
+        this.trucoRound = TrucoRound.iniciarComBaralho(new TrucoDeck(), TrucoPlayer.JOGADOR);
+        this.trucoTableView = new TrucoTableView(this);
+    }
+
     private void configurarMouseListener() {
         addMouseListener(new MouseAdapter() {
             @Override
@@ -184,19 +201,9 @@ public class ScreenSaver extends JPanel implements ActionListener {
             if (sairParaSalao) {
                 processarRetornoB();
             }
-        } else if (estadoAtual == GameState.MENU_TRUCO) {
-            int w = getWidth();
-            int h = getHeight();
-            int painelW = Math.min(800, Math.max(400, w - 80));
-            int painelH = Math.min(500, Math.max(300, h - 80));
-            int px = (w - painelW) / 2;
-            int py = (h - painelH) / 2;
-            int btnW = 260;
-            int btnH = 48;
-            int btnX = px + (painelW - btnW) / 2;
-            int btnY = py + painelH - 85;
-
-            if (x >= btnX && x <= btnX + btnW && y >= btnY && y <= btnY + btnH) {
+        } else if (estadoAtual == GameState.MENU_TRUCO && trucoTableView != null) {
+            boolean sairParaSalao = trucoTableView.processarClique(x, y);
+            if (sairParaSalao) {
                 processarRetornoB();
             }
         }
@@ -260,10 +267,21 @@ public class ScreenSaver extends JPanel implements ActionListener {
             }
         });
 
-        // Teclas numericas para selecao de fichas na mesa
+        // Teclas numericas para selecao de fichas (Blackjack) ou cartas (Truco)
         configurarTeclaAtalhoMesa(im, am, "1", "FICHA_1");
         configurarTeclaAtalhoMesa(im, am, "2", "FICHA_2");
         configurarTeclaAtalhoMesa(im, am, "3", "FICHA_3");
+
+        // Tecla N para Nova Mão no Truco quando finalizada
+        im.put(KeyStroke.getKeyStroke("pressed N"), "press_N");
+        am.put("press_N", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                if (estadoAtual == GameState.MENU_TRUCO && trucoTableView != null) {
+                    trucoTableView.processarTecla("NOVA_MAO");
+                }
+            }
+        });
 
         // Tecla B para retornar ao salao a partir de qualquer mesa
         im.put(KeyStroke.getKeyStroke("pressed B"), "acaoB");
@@ -300,6 +318,8 @@ public class ScreenSaver extends JPanel implements ActionListener {
             public void actionPerformed(ActionEvent e) {
                 if (estadoAtual == GameState.MENU_BLACKJACK && blackjackTableView != null) {
                     blackjackTableView.processarTecla(comando);
+                } else if (estadoAtual == GameState.MENU_TRUCO && trucoTableView != null) {
+                    trucoTableView.processarTecla(comando);
                 }
             }
         });
@@ -757,109 +777,43 @@ public class ScreenSaver extends JPanel implements ActionListener {
     }
 
     /**
-     * Renderiza a tela provisória da mesa de Truco em desenvolvimento.
+     * Renderiza a interface da mesa de Truco Paulista através de TrucoTableView.
      */
     private void desenharMenuTruco(Graphics2D g2d) {
-        int w = getWidth();
-        int h = getHeight();
+        if (trucoTableView != null) {
+            trucoTableView.render(g2d, getWidth(), getHeight());
+        }
+    }
 
-        // Fundo escuro de cassino
-        GradientPaint gradFundo = new GradientPaint(
-                0, 0, new Color(10, 20, 30),
-                0, h, new Color(5, 10, 18)
-        );
-        g2d.setPaint(gradFundo);
-        g2d.fillRect(0, 0, w, h);
+    /**
+     * Inicia uma nova mão de Truco 1 vs 1 alternando o primeiro a jogar.
+     */
+    public void iniciarNovaMaoTruco() {
+        this.proximoPrimeiroDaMao = (this.proximoPrimeiroDaMao == TrucoPlayer.JOGADOR) ? TrucoPlayer.BOT : TrucoPlayer.JOGADOR;
+        this.trucoRound = TrucoRound.iniciarComBaralho(new TrucoDeck(), this.proximoPrimeiroDaMao);
+        if (this.trucoRound.isTurnoBot()) {
+            this.trucoRound.jogarTurnoBot();
+        }
+    }
 
-        // Painel central de feltro com moldura dourada
-        int painelW = Math.min(800, Math.max(400, w - 80));
-        int painelH = Math.min(500, Math.max(300, h - 80));
-        int px = (w - painelW) / 2;
-        int py = (h - painelH) / 2;
+    public TrucoRound getTrucoRound() {
+        return trucoRound;
+    }
 
-        // Sombra do painel
-        g2d.setColor(new Color(0, 0, 0, 140));
-        g2d.fillRoundRect(px + 8, py + 8, painelW, painelH, 24, 24);
+    public void setTrucoRound(TrucoRound trucoRound) {
+        if (trucoRound != null) {
+            this.trucoRound = trucoRound;
+        }
+    }
 
-        // Feltro azul escuro temático de Truco
-        GradientPaint gradFeltro = new GradientPaint(
-                px, py, new Color(18, 55, 85),
-                px, py + painelH, new Color(10, 32, 50)
-        );
-        g2d.setPaint(gradFeltro);
-        g2d.fillRoundRect(px, py, painelW, painelH, 24, 24);
+    public TrucoTableView getTrucoTableView() {
+        return trucoTableView;
+    }
 
-        // Borda dourada chanfrada
-        g2d.setStroke(new BasicStroke(3.0f));
-        g2d.setColor(new Color(255, 215, 0));
-        g2d.drawRoundRect(px, py, painelW, painelH, 24, 24);
-        g2d.setColor(new Color(218, 165, 32, 120));
-        g2d.drawRoundRect(px + 6, py + 6, painelW - 12, painelH - 12, 18, 18);
-
-        // Faixa de cabeçalho
-        g2d.setColor(new Color(0, 0, 0, 120));
-        g2d.fillRoundRect(px + 20, py + 20, painelW - 40, 70, 14, 14);
-        g2d.setColor(new Color(255, 215, 0));
-        g2d.drawRoundRect(px + 20, py + 20, painelW - 40, 70, 14, 14);
-
-        g2d.setFont(new Font("SansSerif", Font.BOLD, 24));
-        FontMetrics fmTitulo = g2d.getFontMetrics();
-        String titulo = "★ TRUCO PAULISTA / MINEIRO ★";
-        g2d.setColor(Color.YELLOW);
-        g2d.drawString(titulo, px + (painelW - fmTitulo.stringWidth(titulo)) / 2, py + 52);
-
-        g2d.setFont(new Font("SansSerif", Font.PLAIN, 13));
-        g2d.setColor(new Color(200, 230, 255));
-        String sub = "Mesa de Cartas do Cassino Social";
-        FontMetrics fmSub = g2d.getFontMetrics();
-        g2d.drawString(sub, px + (painelW - fmSub.stringWidth(sub)) / 2, py + 74);
-
-        // Banner central informativo
-        int bannerY = py + 110;
-        int bannerH = Math.min(220, painelH - 220);
-        g2d.setColor(new Color(0, 0, 0, 100));
-        g2d.fillRoundRect(px + 30, bannerY, painelW - 60, bannerH, 16, 16);
-
-        g2d.setFont(new Font("SansSerif", Font.BOLD, 22));
-        g2d.setColor(new Color(255, 140, 0));
-        String msgStatus = "Truco em desenvolvimento";
-        FontMetrics fmStatus = g2d.getFontMetrics();
-        g2d.drawString(msgStatus, px + (painelW - fmStatus.stringWidth(msgStatus)) / 2, bannerY + 45);
-
-        g2d.setFont(new Font("SansSerif", Font.PLAIN, 15));
-        g2d.setColor(Color.WHITE);
-        String l1 = "A mesa de Truco foi integrada ao salão isométrico com suporte a colisão e Z-sorting.";
-        String l2 = "As regras completas, manilhas e rodadas serão implementadas nas respectivas frentes.";
-        String l3 = "Pressione B para retornar ao salão ou ESC para encerrar o jogo.";
-        FontMetrics fmL = g2d.getFontMetrics();
-        g2d.drawString(l1, px + (painelW - fmL.stringWidth(l1)) / 2, bannerY + 85);
-        g2d.drawString(l2, px + (painelW - fmL.stringWidth(l2)) / 2, bannerY + 115);
-        g2d.drawString(l3, px + (painelW - fmL.stringWidth(l3)) / 2, bannerY + 150);
-
-        // Botão Voltar ao Salão (B)
-        int btnW = 260;
-        int btnH = 48;
-        int btnX = px + (painelW - btnW) / 2;
-        int btnY = py + painelH - 85;
-
-        g2d.setColor(new Color(30, 110, 60));
-        g2d.fillRoundRect(btnX, btnY, btnW, btnH, 12, 12);
-        g2d.setColor(new Color(255, 215, 0));
-        g2d.setStroke(new BasicStroke(2.0f));
-        g2d.drawRoundRect(btnX, btnY, btnW, btnH, 12, 12);
-
-        g2d.setFont(new Font("SansSerif", Font.BOLD, 16));
-        g2d.setColor(Color.WHITE);
-        String txtBtn = "Voltar ao Salão (B)";
-        FontMetrics fmBtn = g2d.getFontMetrics();
-        g2d.drawString(txtBtn, btnX + (btnW - fmBtn.stringWidth(txtBtn)) / 2, btnY + 30);
-
-        // Rodapé de atalhos
-        g2d.setFont(new Font("SansSerif", Font.PLAIN, 12));
-        g2d.setColor(new Color(180, 200, 220));
-        String rodape = "[ B ] ou [ E ] Voltar ao Salão   |   [ ESC ] Sair do Jogo";
-        FontMetrics fmRodape = g2d.getFontMetrics();
-        g2d.drawString(rodape, px + (painelW - fmRodape.stringWidth(rodape)) / 2, py + painelH - 18);
+    public void processarComandoTruco(String comando) {
+        if (estadoAtual == GameState.MENU_TRUCO && trucoTableView != null) {
+            trucoTableView.processarTecla(comando);
+        }
     }
 
     /**
