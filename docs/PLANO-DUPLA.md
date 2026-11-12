@@ -108,6 +108,60 @@ Para enriquecer a ambientação do cassino e suportar futuros jogos, foi adicion
 
 ---
 
+## Motor de Regras do Truco Paulista (Etapa 1 - Model)
+
+Para dar suporte à futura mesa de Truco do salão, foi implementado o motor de regras oficial do **Truco Paulista**, completamente desacoplado de qualquer dependência visual de Swing/UI.
+
+### 1. Baralho Limpo e Hierarquia de Cartas
+- **Baralho Limpo (40 cartas):** exclusão de 8, 9 e 10 de todos os naipes (`TrucoDeck`).
+- **Força das Cartas Comuns (não-manilhas):**
+  $$4 < 5 < 6 < 7 < \text{Dama (Q)} < \text{Valete (J)} < \text{Rei (K)} < \text{Ás (A)} < 2 < 3$$
+  Naipes não desempatam cartas comuns: cartas de mesmo valor resultam em empate na vaza (*canga* / *empacho*).
+- **Sequência Cíclica da Vira para a Manilha:**
+  A manilha é sempre o rank imediatamente seguinte ao da carta vira aberta na mesa:
+  $$4 \to 5 \to 6 \to 7 \to \text{Q} \to \text{J} \to \text{K} \to \text{A} \to 2 \to 3 \to 4$$
+  A virada do 3 define o 4 como a maior manilha do jogo.
+- **Desempate Exclusivo de Manilhas (Os Quatro Tombos):**
+  Quando duas ou mais manilhas (mesmo rank) se enfrentam, o desempate é obrigatório pela força dos naipes:
+  $$\text{Paus (4 - Zap)} > \text{Copas (3 - Copeta)} > \text{Espadas (2 - Espadilha)} > \text{Ouros (1 - Picafumo)}$$
+  Duas manilhas **nunca empatam**.
+
+### 2. Tabela Oficial de Resolução de Vazas da Mão
+
+Uma mão de Truco é disputada em melhor de até 3 vazas entre o Jogador e o Bot:
+
+| Vaza 1 | Vaza 2 | Vaza 3 | Vencedor da Mão | Regra / Justificativa |
+|---|---|---|---|---|
+| **J** | **J** | — | **JOGADOR** | Encerramento antecipado por 2x0 |
+| **B** | **B** | — | **BOT** | Encerramento antecipado por 0x2 |
+| **J** | **B** | **J** | **JOGADOR** | Vitória por 2x1 na terceira vaza |
+| **J** | **B** | **B** | **BOT** | Vitória por 1x2 na terceira vaza |
+| **B** | **J** | **J** | **JOGADOR** | Vitória por 2x1 na terceira vaza |
+| **B** | **J** | **B** | **BOT** | Vitória por 1x2 na terceira vaza |
+| **E** | **J** | — | **JOGADOR** | Empate na 1ª: quem vencer a 2ª leva a mão antecipadamente |
+| **E** | **B** | — | **BOT** | Empate na 1ª: quem vencer a 2ª leva a mão antecipadamente |
+| **J** | **E** | — | **JOGADOR** | Empate na 2ª: quem venceu a 1ª leva a mão antecipadamente |
+| **B** | **E** | — | **BOT** | Empate na 2ª: quem venceu a 1ª leva a mão antecipadamente |
+| **J** | **B** | **E** | **JOGADOR** | Empate na 3ª: quem venceu a 1ª leva a mão |
+| **B** | **J** | **E** | **BOT** | Empate na 3ª: quem venceu a 1ª leva a mão |
+| **E** | **E** | **J** | **JOGADOR** | Duas primeiras empatadas: 3ª decide a mão |
+| **E** | **E** | **B** | **BOT** | Duas primeiras empatadas: 3ª decide a mão |
+| **E** | **E** | **E** | **EMPATE** | Três empates seguidos: mão anulada/sem vencedor |
+
+### 3. Quem Começa Cada Vaza
+- **Vaza 1:** Começa o jogador definido como `primeiroDaMao`.
+- **Vazas 2 e 3:**
+  - Se a vaza anterior teve vencedor: o **vencedor da vaza anterior** joga primeiro.
+  - Se a vaza anterior empatou (*canga*): **quem começou a vaza empatada** continua começando a vaza seguinte.
+
+### 4. Inteligência do Bot Simples com Visibilidade Estrita
+- **Isolamento de Estado:** a IA (`TrucoSimpleAI`) recebe única e exclusivamente a sua própria lista de cartas na mão, a vira pública e a carta já aberta pelo adversário na vaza atual (se houver). NUNCA tem acesso às cartas ocultas do jogador humano.
+- **Estratégia de Recursos:**
+  - Ao abrir a vaza: joga a sua menor carta para sondar a rodada sem gastar cartas altas.
+  - Ao responder: se tiver cartas que vencem a do adversário, escolhe a menor entre as vencedoras (economizando manilhas e cartas mais fortes). Se não puder vencer, prioriza empatar a vaza (*cangar*). Se não puder nem vencer nem empatar, descarta sua menor carta (lixo).
+
+---
+
 ## Fluxo Git da Dupla
 
 1. **Branch de Contrato Compartilhada:** `feat/regras-contrato` (contém o contrato oficial compilado, tipos de dados imutáveis e testes automatizados).
