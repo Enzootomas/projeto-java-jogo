@@ -74,7 +74,18 @@ public class TrucoSimpleAI {
             return menorVencedora;
         }
 
-        // Se nenhuma carta vence a do adversário: descarta a sua menor carta (lixo)
+        // Se nenhuma carta vence, verifica se possui carta que empata (canga a vaza para evitar derrota)
+        List<Card> cartasEmpatadoras = new ArrayList<>();
+        for (Card carta : maoBot) {
+            if (comparador.compare(carta, cartaAdversarioNaMesa) == 0) {
+                cartasEmpatadoras.add(carta);
+            }
+        }
+        if (!cartasEmpatadoras.isEmpty()) {
+            return cartasEmpatadoras.get(0);
+        }
+
+        // Se nenhuma carta vence nem empata a do adversário: descarta a sua menor carta (lixo)
         Card menorDescarte = maoBot.get(0);
         for (int i = 1; i < maoBot.size(); i++) {
             Card atual = maoBot.get(i);
