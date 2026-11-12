@@ -130,6 +130,22 @@ public class Deck {
     }
 
     /**
+     * Devolve uma carta ao topo do baralho (sera a proxima carta retornada em {@link #comprarCarta()}).
+     *
+     * <p>Metodo com visibilidade de pacote ({@code package-private}) utilizado exclusivamente pelo
+     * motor de regras para restaurar atomicamente o estado do baralho caso uma sequencia deterministica
+     * de multiplas compras da banca se esgote no meio da operacao.</p>
+     *
+     * @param carta carta a devolver ao topo (nao pode ser nula).
+     */
+    void devolverCartaAoTopo(Card carta) {
+        if (carta == null) {
+            throw new IllegalArgumentException("Nao e permitido devolver uma carta nula ao baralho.");
+        }
+        this.cartas.add(carta);
+    }
+
+    /**
      * Informa quantas cartas ainda restam para compra no baralho.
      *
      * @return quantidade de cartas restantes ({@code >= 0}).

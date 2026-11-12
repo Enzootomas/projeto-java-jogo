@@ -188,3 +188,53 @@ classDiagram
 - Limpeza de teclas pressionadas no evento `focusLost` e na transição de telas, prevenindo "tecla presa".
 - Tecla ESC encerra o jogo de forma limpa em qualquer estado (salão ou menu da mesa).
 
+## Arquitetura do Motor de Regras do Blackjack (`model`)
+
+Desacoplado de Swing, `Graphics2D`, áudio e entrada de teclado:
+
+```mermaid
+classDiagram
+    BlackjackEngine <|.. BlackjackGame : implementa
+    BlackjackGame *-- Deck : composicao
+    BlackjackGame *-- Hand : maoJogador / maoDealer
+    Deck o-- Card : 52 cartas
+    Hand o-- Card : cartas da mao
+    Card --> Suit : naipe
+    Card --> Rank : valor
+    BlackjackGame --> RoundState : estadoRodada
+    BlackjackGame --> RoundResult : resultadoRodada
+
+    class BlackjackEngine {
+        <<interface>>
+        +iniciarPartida(long valorAposta) boolean
+        +pedirCarta() boolean
+        +parar() void
+        +getSaldoVirtual() long
+        +getApostaAtual() long
+        +getEstadoRodada() RoundState
+        +getResultadoRodada() RoundResult
+        +getMaoJogador() List~Card~
+        +getCartasVisiveisDealer() List~Card~
+        +hasCartaOcultaDealer() boolean
+        +getPontosJogador() int
+        +getPontosDealerVisiveis() int
+    }
+
+    class BlackjackGame {
+        -Deck baralho
+        -Hand maoJogador
+        -Hand maoDealer
+        -long saldoVirtual
+        -long apostaAtual
+        -RoundState estadoRodada
+        -RoundResult resultadoRodada
+        -boolean cartaOcultaDealer
+        -boolean rodadaLiquidada
+        +getUltimoRetornoTotalCreditado() long
+        +getLucroLiquidoUltimaRodada() long
+    }
+```
+
+- **Ocultação Segura:** durante `TURNO_JOGADOR`, `getCartasVisiveisDealer()` retorna `maoDealer.getPrimeirasCartas(1)` (`List.copyOf`), impedindo qualquer vazamento da segunda carta oculta até a transição para `FINALIZADA`.
+- **Liquidação Única e Prevenção de Overflow:** a flag `rodadaLiquidada` garante que o crédito de fichas ocorra exatamente uma vez por partida, usando `Math.subtractExact`, `Math.multiplyExact` e `Math.addExact`.
+
