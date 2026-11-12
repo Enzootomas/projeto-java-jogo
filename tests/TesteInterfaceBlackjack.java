@@ -172,7 +172,7 @@ public class TesteInterfaceBlackjack {
         System.out.println("3. Testando setBlackjackEngine com Motor Alternativo de Teste:");
 
         ScreenSaver painel = new ScreenSaver();
-        BlackjackMockSimulator mockAntigo = (BlackjackMockSimulator) painel.getBlackjackEngine();
+        BlackjackEngine motorAntigo = painel.getBlackjackEngine();
 
         // Cria implementação alternativa de teste de BlackjackEngine
         MotorAlternativoTeste motorInjetado = new MotorAlternativoTeste();
@@ -203,9 +203,9 @@ public class TesteInterfaceBlackjack {
         afirme(motorInjetado.chamadasParar == 1,
                 "Comando de tecla STAND acionou parar no motor injetado");
 
-        // Verifica que o mock antigo não recebeu chamadas
-        afirme(mockAntigo.getEstadoRodada() == RoundState.AGUARDANDO_APOSTA,
-                "Mock antigo permaneceu isolado sem chamadas espúrias");
+        // Verifica que o motor antigo não recebeu chamadas
+        afirme(motorAntigo.getEstadoRodada() == RoundState.AGUARDANDO_APOSTA,
+                "Motor antigo permaneceu isolado sem chamadas espúrias");
 
         // Testa renderização do Salão (HUD) consultando o saldo do motor injetado
         int chamadasAntesHUD = motorInjetado.chamadasGetSaldo;
