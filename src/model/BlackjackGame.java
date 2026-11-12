@@ -1,5 +1,6 @@
 package model;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -115,8 +116,8 @@ public class BlackjackGame implements BlackjackEngine {
      *       a nova rodada nao e iniciada (retorna {@code false}), preservando saldo e estado intactos.</li>
      *   <li>Se as cartas do baralho injetado se esgotarem <strong>durante uma rodada em andamento</strong>
      *       (ao chamar {@link #pedirCarta()} ou durante as compras obrigatorias do dealer em {@link #parar()}),
-     *       uma {@link IllegalStateException} explicita e lancada, evitando mascarar cenarios de teste incompletos
-     *       com cartas aleatorias.</li>
+     *       uma {@link IllegalStateException} explicita e lancada sem repor cartas aleatorias e <strong>preservando
+     *       atomicamente todo o estado anterior</strong> (incluindo carta oculta, mao da banca, baralho e saldo).</li>
      * </ul>
      *
      * @param saldoInicial saldo inicial em fichas virtuais ({@code >= 0}).
@@ -217,11 +218,34 @@ public class BlackjackGame implements BlackjackEngine {
             return;
         }
 
-        // Revela a carta oculta do dealer e executa o turno automatico da banca (para em todo 17)
-        this.cartaOcultaDealer = false;
-        while (this.maoDealer.calcularPontuacao() < LIMITE_PARADA_DEALER) {
-            this.maoDealer.adicionarCarta(comprarCartaSegura());
+        // Simula as compras obrigatorias da banca em uma copia temporaria antes de alterar o estado oficial.
+        // Assim, se o baralho deterministico esgotar no meio do turno do dealer (mesmo apos comprar 1+ cartas),
+        // devolvemos as cartas retiradas ao topo do Deck em laco reverso e preservamos 100% do estado anterior
+        // (estado TURNO_JOGADOR, carta oculta intacta, mao do dealer com 2 cartas e saldo inalterado).
+        Hand maoDealerSimulada = new Hand();
+        for (Card cartaInicial : this.maoDealer.getCartas()) {
+            maoDealerSimulada.adicionarCarta(cartaInicial);
         }
+
+        List<Card> cartasCompradasNoTurno = new ArrayList<>();
+        try {
+            while (maoDealerSimulada.calcularPontuacao() < LIMITE_PARADA_DEALER) {
+                Card novaCarta = comprarCartaSegura();
+                cartasCompradasNoTurno.add(novaCarta);
+                maoDealerSimulada.adicionarCarta(novaCarta);
+            }
+        } catch (RuntimeException falhaEsgotamento) {
+            for (int i = cartasCompradasNoTurno.size() - 1; i >= 0; i--) {
+                this.baralho.devolverCartaAoTopo(cartasCompradasNoTurno.get(i));
+            }
+            throw falhaEsgotamento;
+        }
+
+        // Com todas as compras concluidas com sucesso, efetiva atomicamente a revelacao, a mao da banca e a liquidacao
+        for (Card cartaComprada : cartasCompradasNoTurno) {
+            this.maoDealer.adicionarCarta(cartaComprada);
+        }
+        this.cartaOcultaDealer = false;
 
         RoundResult desfecho = apurarResultadoAposTurnoDoDealer();
         finalizarELiquidarRodadaUnicaVez(desfecho);
