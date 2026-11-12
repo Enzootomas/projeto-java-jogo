@@ -65,6 +65,7 @@ public class TesteTrucoPaulista {
         testarTabelaResolucaoVazas();
         testarControleDeTurnosEValidacoes();
         testarIsolamentoEDecisaoDoBot();
+        testarImutabilidadeDeConsultaVazas();
 
         System.out.println("\n----------------------------------------------------");
         System.out.println("Total de verificacoes do Truco: " + totalVerificacoes);
@@ -393,5 +394,98 @@ public class TesteTrucoPaulista {
         Card copetaAdversario = new Card(Suit.COPAS, Rank.DAMA);
         Card escolhaDescarte = bot.escolherCarta(maoSemZap, vira, copetaAdversario);
         afirme(escolhaDescarte.equals(quatro), "Quando nao pode vencer, Bot descarta a menor carta (4 de lixo)");
+    }
+
+    private static void testarImutabilidadeDeConsultaVazas() {
+        System.out.println("\n9. Testando Imutabilidade de Consulta de getVazaAtual() e getVazas():");
+
+        Card vira = new Card(Suit.COPAS, Rank.SETE);
+        List<Card> maoJ = Arrays.asList(
+                new Card(Suit.PAUS, Rank.QUATRO),
+                new Card(Suit.COPAS, Rank.CINCO),
+                new Card(Suit.ESPADAS, Rank.SEIS)
+        );
+        List<Card> maoB = Arrays.asList(
+                new Card(Suit.OUROS, Rank.QUATRO),
+                new Card(Suit.OUROS, Rank.CINCO),
+                new Card(Suit.OUROS, Rank.SEIS)
+        );
+
+        TrucoRound rodada = new TrucoRound(maoJ, maoB, vira, TrucoPlayer.JOGADOR);
+
+        // 1. Coleção getVazas() é imutável
+        List<TrucoTrick> listaVazas = rodada.getVazas();
+        boolean pegouAdd = false;
+        try {
+            listaVazas.add(new TrucoTrick(1, TrucoPlayer.JOGADOR, vira));
+        } catch (UnsupportedOperationException e) {
+            pegouAdd = true;
+        }
+        afirme(pegouAdd, "getVazas() lanca UnsupportedOperationException ao tentar adicionar elemento");
+
+        boolean pegouClear = false;
+        try {
+            listaVazas.clear();
+        } catch (UnsupportedOperationException e) {
+            pegouClear = true;
+        }
+        afirme(pegouClear, "getVazas() lanca UnsupportedOperationException ao tentar limpar a colecao");
+
+        // 2. Todos os campos declarados de TrucoTrick são final (imutabilidade estrutural)
+        java.lang.reflect.Field[] campos = TrucoTrick.class.getDeclaredFields();
+        boolean todosCamposFinal = true;
+        for (java.lang.reflect.Field campo : campos) {
+            if (!java.lang.reflect.Modifier.isFinal(campo.getModifiers())) {
+                todosCamposFinal = false;
+                break;
+            }
+        }
+        afirme(todosCamposFinal, "Todos os campos de TrucoTrick sao estritamente 'final' (imutaveis)");
+
+        // 3. Nenhum método mutador público exposto em TrucoTrick
+        java.lang.reflect.Method[] metodos = TrucoTrick.class.getMethods();
+        boolean temMutadorPublico = false;
+        for (java.lang.reflect.Method m : metodos) {
+            if (m.getName().startsWith("set") || m.getName().equals("registrarJogada")) {
+                temMutadorPublico = true;
+                break;
+            }
+        }
+        afirme(!temMutadorPublico, "TrucoTrick nao expoem metodos mutadores publicos (setters ou registrarJogada)");
+
+        // 4. Salvar estado original do TrucoRound
+        List<Card> cartasJogadorOriginal = new ArrayList<>(rodada.getMaoJogador());
+        TrucoPlayer vezOriginal = rodada.getVezAtual();
+        TrucoHandResult resultadoOriginal = rodada.getResultadoMao();
+        int qtdCartasBotOriginal = rodada.getQuantidadeCartasBot();
+
+        // 5. Consultar a vaza atual e seus dados diversas vezes
+        TrucoTrick vazaConsultada = rodada.getVazaAtual();
+        afirme(vazaConsultada != null, "getVazaAtual() retorna dados da vaza ativa");
+        afirme(vazaConsultada.getNumeroVaza() == 1, "Vaza consultada e a vaza 1");
+        afirme(vazaConsultada.getCartaJogador() == null, "Carta do jogador na vaza consultada e inicialmente null");
+        afirme(vazaConsultada.getCartaBot() == null, "Carta do bot na vaza consultada e inicialmente null");
+        afirme(vazaConsultada.getResultado() == null, "Resultado da vaza consultada e inicialmente null");
+
+        // 6. Confirmar que consultas NUNCA alteram as cartas, o turno ou o resultado
+        afirme(rodada.getMaoJogador().equals(cartasJogadorOriginal),
+                "Consultar a vaza nao altera as cartas da mao do jogador");
+        afirme(rodada.getQuantidadeCartasBot() == qtdCartasBotOriginal,
+                "Consultar a vaza nao altera a quantidade de cartas do bot");
+        afirme(rodada.getVezAtual() == vezOriginal,
+                "Consultar a vaza nao altera o turno da rodada (continua sendo " + vezOriginal + ")");
+        afirme(rodada.getResultadoMao() == resultadoOriginal,
+                "Consultar a vaza nao altera o resultado da mao (continua sendo " + resultadoOriginal + ")");
+
+        // 7. Confirmar que apenas TrucoRound pode registrar jogadas e transitar estado
+        rodada.jogarCartaJogador(maoJ.get(0));
+        afirme(rodada.getMaoJogador().size() == 2,
+                "Apenas o ponto de entrada TrucoRound.jogarCartaJogador altera o estado da rodada");
+        afirme(rodada.getVazas().get(0).getCartaJogador().equals(maoJ.get(0)),
+                "Apos jogada oficial via TrucoRound, novo snapshot da vaza 1 reflete a carta jogada");
+        afirme(vazaConsultada.getCartaJogador() == null,
+                "Snapshot obtido anteriormente permanece intacto e imutavel (valor original null)");
+        afirme(rodada.getVazas().size() == 2,
+                "Apos resolucao da vaza 1, TrucoRound iniciou a vaza 2 com novo snapshot imutavel");
     }
 }
