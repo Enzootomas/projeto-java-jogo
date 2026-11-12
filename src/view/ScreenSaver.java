@@ -19,6 +19,7 @@ import javax.swing.JPanel;
 import javax.swing.KeyStroke;
 import javax.swing.Timer;
 import model.BlackjackEngine;
+import model.BlackjackGame;
 import model.TrucoDeck;
 import model.TrucoPlayer;
 import model.TrucoRound;
@@ -167,11 +168,11 @@ public class ScreenSaver extends JPanel implements ActionListener {
     }
 
     /**
-     * Inicializa a interface da mesa de Blackjack acoplada ao simulador/mock visual.
-     * O motor oficial de regras será fornecido pelo colega na classe BlackjackGame.
+     * Inicializa a interface da mesa de Blackjack acoplada ao motor oficial de regras BlackjackGame.
+     * O simulador/mock BlackjackMockSimulator continua disponível para testes que dependam dele.
      */
     private void configurarMesaBlackjack() {
-        this.blackjackEngine = new BlackjackMockSimulator();
+        this.blackjackEngine = new BlackjackGame();
         this.blackjackTableView = new BlackjackTableView(this.blackjackEngine);
     }
 
