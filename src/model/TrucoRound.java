@@ -154,7 +154,7 @@ public class TrucoRound {
     }
 
     public List<TrucoTrick> getVazas() {
-        return Collections.unmodifiableList(vazas);
+        return List.copyOf(vazas);
     }
 
     public TrucoTrick getVazaAtual() {
