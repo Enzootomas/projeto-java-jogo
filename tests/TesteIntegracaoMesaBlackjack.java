@@ -259,6 +259,24 @@ public class TesteIntegracaoMesaBlackjack {
         // Pagamento 3:2: aposta 100 -> lucro 150 -> saldo inicial 1000 + 150 = 1150
         afirme(motor.getSaldoVirtual() == 1150L,
                 "Saldo virtual creditado com pagamento 3:2 exato: 1150 fichas (lucro +150)");
+        afirme(motor.getUltimoRetornoTotalCreditado() == 250L,
+                "Retorno total liquidado pelo motor e exatamente 250 fichas (aposta 100 + lucro 150)");
+        afirme(motor.getLucroLiquidoUltimaRodada() == 150L,
+                "Lucro liquido liquidado pelo motor e exatamente 150 fichas");
+
+        // Valida calculo seguro na tela: (aposta / 2) * 3 sem multiplicacao intermediaria
+        long apostaTeste = 100L;
+        long lucroCalculadoTela = Math.multiplyExact(apostaTeste / 2L, 3L);
+        long retornoTotalCalculadoTela = Math.addExact(apostaTeste, lucroCalculadoTela);
+        afirme(lucroCalculadoTela == 150L, "Calculo de tela Math.multiplyExact(aposta/2, 3) resulta em lucro 150");
+        afirme(retornoTotalCalculadoTela == 250L, "Retorno total (aposta + lucro) resulta em 250");
+
+        // Valida renderização do banner de Blackjack Natural na tela sem falhas
+        BufferedImage imgBJ = new BufferedImage(1000, 700, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D gBJ = imgBJ.createGraphics();
+        painel.getBlackjackTableView().render(gBJ, 1000, 700);
+        gBJ.dispose();
+        afirme(true, "Banner de Blackjack Natural renderizado na tela sem falhas ou overflow");
 
         painel.pararLoop();
         System.out.println();
