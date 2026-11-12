@@ -1,7 +1,9 @@
 package tests;
 
 import model.BlackjackEngine;
+import model.BlackjackGame;
 import model.Card;
+import model.Deck;
 import model.Rank;
 import model.RoundResult;
 import model.RoundState;
@@ -104,27 +106,28 @@ public class TesteInterfaceBlackjack {
         System.out.println("2. Testando Controle Independente de Teclas Fisicas (W + Seta Cima):");
 
         ScreenSaver painel = new ScreenSaver();
+        try {
+            // 1. Pressiona W e UP simultaneamente
+            painel.simularPressionarTecla("W");
+            painel.simularPressionarTecla("UP");
+            afirme(painel.isMovendoParaCima(), "Segurando W + Seta UP: movimento para cima ativo");
 
-        // 1. Pressiona W e UP simultaneamente
-        painel.simularPressionarTecla("W");
-        painel.simularPressionarTecla("UP");
-        afirme(painel.isMovendoParaCima(), "Segurando W + Seta UP: movimento para cima ativo");
+            // 2. Solta apenas W; a Seta UP continua pressionada
+            painel.simularSoltarTecla("W");
+            afirme(painel.isMovendoParaCima(), "Soltando W mas mantendo Seta UP: movimento para cima continua ativo!");
 
-        // 2. Solta apenas W; a Seta UP continua pressionada
-        painel.simularSoltarTecla("W");
-        afirme(painel.isMovendoParaCima(), "Soltando W mas mantendo Seta UP: movimento para cima continua ativo!");
+            // 3. Solta a Seta UP; o movimento agora cessa
+            painel.simularSoltarTecla("UP");
+            afirme(!painel.isMovendoParaCima(), "Soltando Seta UP: movimento para cima cessou completamente");
 
-        // 3. Solta a Seta UP; o movimento agora cessa
-        painel.simularSoltarTecla("UP");
-        afirme(!painel.isMovendoParaCima(), "Soltando Seta UP: movimento para cima cessou completamente");
-
-        // 4. Tecla S no salão move para baixo
-        painel.simularPressionarTecla("S");
-        afirme(painel.isMovendoParaBaixo(), "Tecla S no salao aciona movimento para baixo");
-        painel.simularSoltarTecla("S");
-        afirme(!painel.isMovendoParaBaixo(), "Soltar tecla S cessa movimento para baixo");
-
-        painel.pararLoop();
+            // 4. Tecla S no salão move para baixo
+            painel.simularPressionarTecla("S");
+            afirme(painel.isMovendoParaBaixo(), "Tecla S no salao aciona movimento para baixo");
+            painel.simularSoltarTecla("S");
+            afirme(!painel.isMovendoParaBaixo(), "Soltar tecla S cessa movimento para baixo");
+        } finally {
+            painel.pararLoop();
+        }
         System.out.println();
     }
 
@@ -132,92 +135,120 @@ public class TesteInterfaceBlackjack {
         System.out.println("3. Testando Preservacao de Rodada em Andamento ao Alternar Telas:");
 
         ScreenSaver painel = new ScreenSaver();
-        BlackjackEngine motorOriginal = painel.getBlackjackEngine();
-        afirme(motorOriginal != null, "Motor de Blackjack inicializado no painel");
+        try {
+            // Distribuição determinística sem Blackjack natural em nenhum dos lados:
+            // Jogador: 10 de Copas + 7 de Ouros = 17 pontos
+            // Dealer:  8 de Espadas (aberto) + 9 de Paus (oculto) = 17 pontos
+            List<Card> cartas = new ArrayList<>();
+            cartas.add(new Card(Suit.COPAS, Rank.DEZ));
+            cartas.add(new Card(Suit.ESPADAS, Rank.OITO));
+            cartas.add(new Card(Suit.OUROS, Rank.SETE));
+            cartas.add(new Card(Suit.PAUS, Rank.NOVE));
+            cartas.add(new Card(Suit.COPAS, Rank.CINCO));
+            cartas.add(new Card(Suit.ESPADAS, Rank.SEIS));
 
-        // Inicia uma partida na mesa
-        boolean iniciou = motorOriginal.iniciarPartida(200L);
-        afirme(iniciou, "Partida iniciada com aposta de 200 fichas");
-        afirme(motorOriginal.getEstadoRodada() == RoundState.TURNO_JOGADOR, "Rodada esta no TURNO_JOGADOR");
-        int cartasJogadorAntes = motorOriginal.getMaoJogador().size();
-        afirme(cartasJogadorAntes == 2, "Jogador recebeu 2 cartas");
+            Deck deckDeterministico = new Deck(cartas);
+            BlackjackGame motorDeterministico = new BlackjackGame(1000L, deckDeterministico, false);
 
-        // Simula transição para a mesa
-        painel.setEstadoAtual(ScreenSaver.GameState.MENU_BLACKJACK);
-        afirme(painel.getEstadoAtual() == ScreenSaver.GameState.MENU_BLACKJACK, "Painel abriu a tela da mesa");
+            painel.setBlackjackEngine(motorDeterministico);
+            BlackjackEngine motorAtivo = painel.getBlackjackEngine();
+            afirme(motorAtivo == motorDeterministico, "BlackjackGame com baralho deterministico injetado no painel");
 
-        // Simula saída para o salão (pressionando B ou botão voltar)
-        painel.setEstadoAtual(ScreenSaver.GameState.SALAO);
-        afirme(painel.getEstadoAtual() == ScreenSaver.GameState.SALAO, "Painel retornou ao salao");
+            // Inicia uma partida na mesa com aposta de 200 fichas
+            boolean iniciou = motorAtivo.iniciarPartida(200L);
+            afirme(iniciou, "Partida iniciada com aposta de 200 fichas");
+            afirme(motorAtivo.getEstadoRodada() == RoundState.TURNO_JOGADOR,
+                    "Rodada esta no TURNO_JOGADOR (sem Blackjack natural)");
+            int cartasJogadorAntes = motorAtivo.getMaoJogador().size();
+            afirme(cartasJogadorAntes == 2, "Jogador recebeu 2 cartas (17 pontos)");
+            afirme(motorAtivo.hasCartaOcultaDealer(), "Dealer possui carta oculta durante o turno do jogador");
+            afirme(motorAtivo.getCartasVisiveisDealer().size() == 1,
+                    "Apenas 1 carta do dealer e visivel para o jogador na mesa");
+            afirme(motorAtivo.getApostaAtual() == 200L, "Aposta de 200 fichas registrada na rodada");
 
-        // Simula reabertura da mesa (pressionando E próximo à mesa)
-        painel.setEstadoAtual(ScreenSaver.GameState.MENU_BLACKJACK);
-        afirme(painel.getEstadoAtual() == ScreenSaver.GameState.MENU_BLACKJACK, "Painel reabriu a tela da mesa");
+            // Simula transição para a mesa
+            painel.setEstadoAtual(ScreenSaver.GameState.MENU_BLACKJACK);
+            afirme(painel.getEstadoAtual() == ScreenSaver.GameState.MENU_BLACKJACK, "Painel abriu a tela da mesa");
 
-        // Garante que o motor de jogo continua exatamente a mesma instância
-        BlackjackEngine motorAposTransicao = painel.getBlackjackEngine();
-        afirme(motorOriginal == motorAposTransicao, "A mesma instancia do motor e preservada entre transicoes");
-        afirme(motorAposTransicao.getEstadoRodada() == RoundState.TURNO_JOGADOR,
-                "Estado TURNO_JOGADOR continua ativo, sem reset da rodada");
-        afirme(motorAposTransicao.getMaoJogador().size() == cartasJogadorAntes,
-                "Cartas da mao do jogador foram preservadas intactas");
-        afirme(motorAposTransicao.getApostaAtual() == 200L,
-                "Valor da aposta em andamento foi preservado intacto");
+            // Simula saída para o salão (pressionando tecla B)
+            painel.processarRetornoB();
+            afirme(painel.getEstadoAtual() == ScreenSaver.GameState.SALAO, "Tecla B retornou ao salao");
 
-        painel.pararLoop();
+            // Simula reabertura da mesa (pressionando E próximo à mesa)
+            painel.setEstadoAtual(ScreenSaver.GameState.MENU_BLACKJACK);
+            afirme(painel.getEstadoAtual() == ScreenSaver.GameState.MENU_BLACKJACK, "Tecla E reabriu a tela da mesa");
+
+            // Garante que o motor de jogo continua exatamente a mesma instância
+            BlackjackEngine motorAposTransicao = painel.getBlackjackEngine();
+            afirme(motorAtivo == motorAposTransicao, "A mesma instancia do motor e preservada entre transicoes");
+            afirme(motorAposTransicao.getEstadoRodada() == RoundState.TURNO_JOGADOR,
+                    "Estado TURNO_JOGADOR continua ativo, sem reset da rodada");
+            afirme(motorAposTransicao.hasCartaOcultaDealer(),
+                    "Carta oculta da banca continua preservada apos retorno");
+            afirme(motorAposTransicao.getCartasVisiveisDealer().size() == 1,
+                    "Apenas 1 carta da banca permanece visivel apos retorno");
+            afirme(motorAposTransicao.getMaoJogador().size() == cartasJogadorAntes,
+                    "Cartas da mao do jogador foram preservadas intactas");
+            afirme(motorAposTransicao.getApostaAtual() == 200L,
+                    "Valor da aposta em andamento foi preservado intacto (200 fichas)");
+        } finally {
+            painel.pararLoop();
+        }
         System.out.println();
     }
 
     private static void testarInjecaoMotorAlternativo() {
-        System.out.println("3. Testando setBlackjackEngine com Motor Alternativo de Teste:");
+        System.out.println("4. Testando setBlackjackEngine com Motor Alternativo de Teste:");
 
         ScreenSaver painel = new ScreenSaver();
-        BlackjackEngine motorAntigo = painel.getBlackjackEngine();
+        try {
+            BlackjackEngine motorAntigo = painel.getBlackjackEngine();
 
-        // Cria implementação alternativa de teste de BlackjackEngine
-        MotorAlternativoTeste motorInjetado = new MotorAlternativoTeste();
+            // Cria implementação alternativa de teste de BlackjackEngine
+            MotorAlternativoTeste motorInjetado = new MotorAlternativoTeste();
 
-        // Injeta no painel principal
-        painel.setBlackjackEngine(motorInjetado);
+            // Injeta no painel principal
+            painel.setBlackjackEngine(motorInjetado);
 
-        afirme(painel.getBlackjackEngine() == motorInjetado,
-                "Painel passou a usar diretamente a nova instancia de BlackjackEngine");
-        afirme(painel.getBlackjackTableView().getEngine() == motorInjetado,
-                "BlackjackTableView foi recriada apontando para o motor injetado");
+            afirme(painel.getBlackjackEngine() == motorInjetado,
+                    "Painel passou a usar diretamente a nova instancia de BlackjackEngine");
+            afirme(painel.getBlackjackTableView().getEngine() == motorInjetado,
+                    "BlackjackTableView foi recriada apontando para o motor injetado");
 
-        // Testa renderização com o novo motor
-        BufferedImage buffer = new BufferedImage(1000, 700, BufferedImage.TYPE_INT_ARGB);
-        Graphics2D g2d = buffer.createGraphics();
-        painel.getBlackjackTableView().render(g2d, 1000, 700);
-        g2d.dispose();
-        afirme(motorInjetado.chamadasGetSaldo > 0,
-                "Renderizacao consultou o saldo do motor injetado (Chamadas: " + motorInjetado.chamadasGetSaldo + ")");
+            // Testa renderização com o novo motor
+            BufferedImage buffer = new BufferedImage(1000, 700, BufferedImage.TYPE_INT_ARGB);
+            Graphics2D g2d = buffer.createGraphics();
+            painel.getBlackjackTableView().render(g2d, 1000, 700);
+            g2d.dispose();
+            afirme(motorInjetado.chamadasGetSaldo > 0,
+                    "Renderizacao consultou o saldo do motor injetado (Chamadas: " + motorInjetado.chamadasGetSaldo + ")");
 
-        // Testa acionamento de ações no motor injetado via atalhos
-        motorInjetado.setEstado(RoundState.TURNO_JOGADOR);
-        painel.getBlackjackTableView().processarTecla("HIT");
-        afirme(motorInjetado.chamadasPedirCarta == 1,
-                "Comando de tecla HIT acionou pedirCarta no motor injetado");
+            // Testa acionamento de ações no motor injetado via atalhos
+            motorInjetado.setEstado(RoundState.TURNO_JOGADOR);
+            painel.getBlackjackTableView().processarTecla("HIT");
+            afirme(motorInjetado.chamadasPedirCarta == 1,
+                    "Comando de tecla HIT acionou pedirCarta no motor injetado");
 
-        painel.getBlackjackTableView().processarTecla("STAND");
-        afirme(motorInjetado.chamadasParar == 1,
-                "Comando de tecla STAND acionou parar no motor injetado");
+            painel.getBlackjackTableView().processarTecla("STAND");
+            afirme(motorInjetado.chamadasParar == 1,
+                    "Comando de tecla STAND acionou parar no motor injetado");
 
-        // Verifica que o motor antigo não recebeu chamadas
-        afirme(motorAntigo.getEstadoRodada() == RoundState.AGUARDANDO_APOSTA,
-                "Motor antigo permaneceu isolado sem chamadas espúrias");
+            // Verifica que o motor antigo não recebeu chamadas
+            afirme(motorAntigo.getEstadoRodada() == RoundState.AGUARDANDO_APOSTA,
+                    "Motor antigo permaneceu isolado sem chamadas espúrias");
 
-        // Testa renderização do Salão (HUD) consultando o saldo do motor injetado
-        int chamadasAntesHUD = motorInjetado.chamadasGetSaldo;
-        painel.setSize(new Dimension(1000, 700));
-        BufferedImage bufferSalao = new BufferedImage(1000, 700, BufferedImage.TYPE_INT_ARGB);
-        Graphics2D gSalao = bufferSalao.createGraphics();
-        painel.paint(gSalao);
-        gSalao.dispose();
-        afirme(motorInjetado.chamadasGetSaldo > chamadasAntesHUD,
-                "HUD do salao consultou diretamente o saldo do motor injetado (" + motorInjetado.getSaldoVirtual() + " fichas)");
-
-        painel.pararLoop();
+            // Testa renderização do Salão (HUD) consultando o saldo do motor injetado
+            int chamadasAntesHUD = motorInjetado.chamadasGetSaldo;
+            painel.setSize(new Dimension(1000, 700));
+            BufferedImage bufferSalao = new BufferedImage(1000, 700, BufferedImage.TYPE_INT_ARGB);
+            Graphics2D gSalao = bufferSalao.createGraphics();
+            painel.paint(gSalao);
+            gSalao.dispose();
+            afirme(motorInjetado.chamadasGetSaldo > chamadasAntesHUD,
+                    "HUD do salao consultou diretamente o saldo do motor injetado (" + motorInjetado.getSaldoVirtual() + " fichas)");
+        } finally {
+            painel.pararLoop();
+        }
         System.out.println();
     }
 
