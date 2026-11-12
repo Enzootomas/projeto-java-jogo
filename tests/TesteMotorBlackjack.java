@@ -498,7 +498,7 @@ public class TesteMotorBlackjack {
         afirme(deckQuatroCartasParaHit.estaVazio(),
                 "Baralho injetado permanece vazio (0 cartas), comprovando ausencia de reposicao aleatoria");
 
-        // Caso 2b: Esgotamento durante compras obrigatorias do dealer em parar() -> sinaliza IllegalStateException
+        // Caso 2b: Esgotamento imediato em parar() (0 cartas extras) -> preserva estado anterior sem alterar carta oculta/saldo
         Deck deckQuatroCartasDealerPrecisaComprar = new Deck(List.of(
                 c(Suit.COPAS, Rank.DEZ),      // Jogador 1
                 c(Suit.ESPADAS, Rank.SEIS),   // Dealer aberta (6)
@@ -515,8 +515,51 @@ public class TesteMotorBlackjack {
         }
         afirme(sinalizouEsgotamentoNoTurnoDealer,
                 "parar() com dealer < 17 e baralho injetado esgotado lanca IllegalStateException explicita");
+        afirme(gameEsgotaNoDealer.getEstadoRodada() == RoundState.TURNO_JOGADOR
+                        && gameEsgotaNoDealer.getResultadoRodada() == RoundResult.EM_ANDAMENTO,
+                "Falha em parar() preserva estado anterior (TURNO_JOGADOR / EM_ANDAMENTO)");
+        afirme(gameEsgotaNoDealer.hasCartaOcultaDealer()
+                        && gameEsgotaNoDealer.getCartasVisiveisDealer().size() == 1
+                        && gameEsgotaNoDealer.getPontosDealerVisiveis() == 6,
+                "Falha em parar() preserva a carta oculta do dealer sem vaza-la");
+        afirme(gameEsgotaNoDealer.getSaldoVirtual() == 900L,
+                "Falha em parar() preserva o saldo anterior (900) sem liquidacao prematura");
         afirme(deckQuatroCartasDealerPrecisaComprar.estaVazio(),
                 "Baralho injetado permanece vazio apos falha explicita no turno do dealer");
+
+        // Caso 2c: Banca consegue comprar 1 carta (ex.: 5 + 6 + 3 = 14 < 17), mas o baralho acaba antes da 2a compra!
+        // Deve reverter integralmente a compra parcial da banca, devolvendo a carta ao topo do Deck e preservando tudo!
+        Card quintaCartaUnica = c(Suit.COPAS, Rank.TRES);
+        Deck deckCincoCartasDealerCompraUmaEFalha = new Deck(List.of(
+                c(Suit.COPAS, Rank.DEZ),      // Jogador 1
+                c(Suit.ESPADAS, Rank.CINCO),  // Dealer aberta (5)
+                c(Suit.OUROS, Rank.OITO),     // Jogador 2 (18)
+                c(Suit.PAUS, Rank.SEIS),      // Dealer oculta (6 -> soma inicial 11)
+                quintaCartaUnica              // 1a compra do dealer (11 + 3 = 14 < 17 -> tenta 2a compra e esgota!)
+        ));
+        BlackjackGame gameDealerCompraUmaEFalha = new BlackjackGame(1000L, deckCincoCartasDealerCompraUmaEFalha);
+        afirme(gameDealerCompraUmaEFalha.iniciarPartida(100L),
+                "Inicia partida com 5 cartas (sobra exatamente 1 carta no Deck apos distribuicao)");
+        boolean sinalizouAposPrimeiraCompraDealer = false;
+        try {
+            gameDealerCompraUmaEFalha.parar();
+        } catch (IllegalStateException e) {
+            sinalizouAposPrimeiraCompraDealer = true;
+        }
+        afirme(sinalizouAposPrimeiraCompraDealer,
+                "parar() lanca IllegalStateException quando a banca compra 1 carta (vai a 14) e o baralho acaba na compra seguinte");
+        afirme(gameDealerCompraUmaEFalha.getEstadoRodada() == RoundState.TURNO_JOGADOR
+                        && gameDealerCompraUmaEFalha.getResultadoRodada() == RoundResult.EM_ANDAMENTO,
+                "Apos falha parcial na 2a compra da banca, estado permanece TURNO_JOGADOR / EM_ANDAMENTO");
+        afirme(gameDealerCompraUmaEFalha.hasCartaOcultaDealer()
+                        && gameDealerCompraUmaEFalha.getCartasVisiveisDealer().size() == 1
+                        && gameDealerCompraUmaEFalha.getPontosDealerVisiveis() == 5,
+                "Apos falha parcial da banca, carta oculta permanece protegida e mao da banca nao fica parcialmente alterada");
+        afirme(gameDealerCompraUmaEFalha.getSaldoVirtual() == 900L,
+                "Apos falha parcial da banca, saldo permanece rigorosamente inalterado (900)");
+        afirme(deckCincoCartasDealerCompraUmaEFalha.cartasRestantes() == 1
+                        && deckCincoCartasDealerCompraUmaEFalha.getCartasRestantesSnapshot().get(0).equals(quintaCartaUnica),
+                "Carta comprada na tentativa abortada da banca foi restaurada ao topo do Deck (3 de Copas)");
         System.out.println();
     }
 }
