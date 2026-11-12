@@ -1,185 +1,124 @@
 # Plano de trabalho em dupla
 
-Tema confirmado: **Cassino Social 2D Isométrico (estilo Habbo)**. O jogador controla seu avatar pelo salão do cassino, desvia de mesas e paredes, interage com a mesa de jogo e joga Blackjack solo contra o crupiê (fichas virtuais).
+Tema confirmado: **Cassino Social 2D Isométrico (estilo Habbo)**. O jogador controla seu avatar pelo salão do cassino, desvia de mesas, cadeiras, balcão e paredes, interage contextualmente com as mesas de jogo e disputa partidas solo com fichas 100% virtuais (Blackjack e Truco Paulista).
 
-| Etapa | Integrante A | Integrante B | Critério de aceite |
+## Identificação da Dupla
+- **Integrante A — Enzo Gabriel Tomas De Souza (`@Enzootomas`):** Frente Mundo Isométrico, Hierarquia Visual, Interfaces das Mesas (`ScreenSaver`, `BlackjackTableView`, `TrucoTableView`), Áudio e Truco Paulista.
+- **Integrante B — Guilherme Bueno (`@guibuenoc`):** Frente Motor de Regras do Blackjack (`Deck`, `Hand`, `BlackjackGame`), Matemática de Apostas Virtuais, Testes Determinísticos, Revisão Técnica e Documentação de Entrega.
+
+| Etapa | Enzo (`@Enzootomas`) | Guilherme Bueno (`@guibuenoc`) | Critério de aceite |
 |---|---|---|---|
-| **1 — Base e POO [CONCLUÍDA]** | `MyShape`, `MyRectangle` e `MySquare` | `MyEllipse`, `MyCircle` e testes | Hierarquia compila; 32 testes automáticos passam; pilares explicados |
-| **2 — Salão Isométrico, Janela e Controles [CONCLUÍDA]** | `App` (tela cheia/ESC), loop (Timer 60 FPS com dt), projeção 2:1 e `IsometricHelper` | `ScreenSaver` (Key Bindings, z-sorting, mesa), `MyCharacter` (sprite PNG, som WAV, footprint) | Janela sem bordas em tela cheia, ESC encerra, movimento normalizado, colisão por eixos com deslizamento, 47 testes passando |
-| **3 — Mobília e Ambientação do Salão [CONCLUÍDA]** | `CasinoCounter` e `CasinoChair` (subclasses de `MyRectangle` com footprint sólido e Z-sorting) | Paredes isométricas, portal com letreiro, tapete decorativo e percurso validado | Salão ambientado com profundidade correta (frente/trás), colisões sólidas, caminho livre e 70 testes passando |
-| **4 — Mesas de Jogo e Interfaces [EM ANDAMENTO]** | Interface Blackjack, mesa de Truco e tela provisória (Enzo) | Motor de regras do Blackjack e ciclo de apostas (Colega) | Mesas identificadas no salão, seleção pela menor distância euclidiana, telas dedicadas com transição fluida |
-| **5 — Áudio, Polimento e Entrega** | Efeitos sonoros (`Clip` pré-carregado e rebobinado) | Revisão geral, remoção por laço reverso e testes na máquina da apresentação | Áudio sem travamentos; código compila via PowerShell/IDE; ensaio dos dois integrantes |
+| **1 — Base e POO [CONCLUÍDA]** | `MyShape`, `MyRectangle` e `MySquare` | `MyEllipse`, `MyCircle` e suíte base de POO | Hierarquia compila; invariantes validados; pilares explicados |
+| **2 — Salão Isométrico, Janela e Controles [CONCLUÍDA]** | `App` (tela cheia/ESC), loop (`Timer` 60 FPS com `dt`), projeção 2:1 e `IsometricHelper` | Revisão de `ScreenSaver` (Key Bindings, *z-sorting*), `MyCharacter` (sprite PNG, som WAV, *footprint*) | Janela sem bordas em tela cheia, `ESC` encerra, movimento normalizado, colisão por eixos com deslizamento |
+| **3 — Mobília e Ambientação do Salão [CONCLUÍDA]** | `CasinoCounter`, `CasinoChair`, paredes isométricas, portal com letreiro e tapete | Validação de rotas livres, profundidade frente/trás e testes de colisão | Salão ambientado com *z-sorting* correto e 77 verificações em `TestePOO` passando |
+| **4 — Mesas de Jogo, Motores e Integração [CONCLUÍDA]** | `BlackjackTableView`, mesa e motor `TrucoRound` + `TrucoTableView`, integração em `ScreenSaver` | `Deck`, `Hand`, `BlackjackGame` (`BlackjackEngine`), testes determinísticos de baralho, motor e rollback | Blackjack e Truco 100% jogáveis nas mesas do salão, carta oculta protegida, saldo sincronizado e retomada por `B`/`E` |
+| **5 — Revisão Cruzada, Testes e Preparação da Entrega [EM FINALIZAÇÃO]** | Efeitos sonoros (`Clip` pré-carregado/rebobinado) e estabilização das suítes gráficas | Revisão técnica de PRs, bateria de 9 suítes automatizadas, documentação final e roteiro de defesa ao vivo | 9 suítes passando (`exit 0`); compilação limpa via PowerShell/IDE; guia de apresentação pronto para a prova |
 
 ## Divisão de Frentes de Trabalho
 
-O desenvolvimento segue dividido em duas frentes complementares e independentes:
+O desenvolvimento é organizado em duas frentes complementares e independentes:
 
-1. **Frente Mundo e Interface (Enzo):**
-   * Salão isométrico, avatar, controles contínuos, detecção de colisões no chão, z-sorting, transição de telas/menus, sprites em pixel art e reprodução de efeitos sonoros com `Clip`.
-   * Branches de trabalho: `feat/mundo-<tarefa>`
-2. **Frente Regras e Motor do Jogo (Colega):**
-   * Baralho de 52 cartas, distribuição, cálculo de pontuação (Ás como 1 ou 11), mãos do jogador e do dealer, inteligência do dealer (parar no 17), ciclo de apostas e gestão de saldo de fichas virtuais.
-   * Branches de trabalho: `feat/regras-<tarefa>`
+1. **Frente Mundo e Interface (Enzo Gabriel Tomas De Souza):**
+   * Salão isométrico, avatar, controles contínuos, detecção de colisões no chão, *z-sorting*, transição de telas/menus, interfaces gráficas das mesas, sprites em pixel art, Truco Paulista e efeitos sonoros com `Clip`.
+   * Branches de trabalho: `feat/mundo-<tarefa>` e `feat/integracao-blackjack`.
+2. **Frente Regras, Motores de Cartas e Qualidade (Guilherme Bueno):**
+   * Baralho de 52 cartas (`Deck`), cálculo de mãos e Ases (`Hand`), motor oficial `BlackjackGame` (dealer no 17, apostas pares, pagamento 3:2, rollback atômico), expansão de motores de cartas (Texas Hold'em), testes determinísticos e documentação técnica.
+   * Branches de trabalho: `feat/regras-<tarefa>` e `docs/<tarefa>`.
 
-Ambos trabalham em seus respectivos computadores, com suas próprias contas Git. **Nenhum integrante faz commit ou push diretamente na branch `main`**. O colega iniciará seus trabalhos puxando a branch compartilhada `feat/regras-contrato`.
+Ambos trabalham em seus respectivos computadores, com suas próprias contas Git, revisando via Pull Request. **Nenhum integrante faz commit, push ou merge diretamente na branch `main`**.
 
 ---
 
-## Contrato de Integração Oficial: Interface (View) $\leftrightarrow$ Motor de Regras (Model)
+## Contrato de Integração Oficial: Interface (View) $\leftrightarrow$ Motor de Blackjack (Model)
 
-Para garantir que o colega possa desenvolver o motor do Blackjack e Enzo possa desenvolver a interface da mesa sem acoplamento ou vazamento de segredos, formalizamos a interface `BlackjackEngine` e seus tipos de suporte:
+Para garantir desacoplamento total entre interface visual e regras de negócio sem vazamento de cartas ocultas, a mesa consome a interface `BlackjackEngine`:
 
 ### 1. Tipos de Apoio
 - **`Suit` (Enum):** `COPAS`, `ESPADAS`, `OUROS`, `PAUS` (com símbolo e nome em português).
 - **`Rank` (Enum):** `AS` a `REI` (valores de Blackjack 2 a 10, figuras valendo 10 e Ás valendo 11 ou 1).
-- **`Card` (Classe Imutável):** representa a carta com naipe e valor, com formatação para apresentação textual e visual.
+- **`Card` (Classe Imutável):** representa a carta com naipe e valor, compartilhada entre os jogos de cartas do cassino.
 - **`RoundState` (Enum):** estados explícitos da rodada:
   - `AGUARDANDO_APOSTA`: início ou entre rodadas.
   - `TURNO_JOGADOR`: cartas distribuídas, dealer com 1 carta visível e 1 oculta virada para baixo.
   - `FINALIZADA`: desfecho apurado, carta oculta revelada e saldo liquidado.
 - **`RoundResult` (Enum):** resultados com liquidação matemática:
   - `EM_ANDAMENTO`: rodada ativa.
-  - `JOGADOR_BLACKJACK`: vitória com 21 natural. Paga **3:2** sobre a aposta.
+  - `JOGADOR_BLACKJACK`: vitória com 21 natural (2 cartas). Paga **3:2** sobre a aposta.
   - `JOGADOR_VITORIA`: pontuação maior que dealer ou dealer estourou. Paga **1:1**.
-  - `EMPATE_PUSH`: empate na pontuação final. Devolve a aposta original integralmente.
+  - `EMPATE_PUSH`: empate na pontuação final ou duplo Blackjack Natural. Devolve a aposta integralmente.
   - `JOGADOR_ESTOUROU` / `DEALER_VITORIA` / `DEALER_BLACKJACK`: derrota do jogador (retorno 0).
 
 ### 2. Regras Específicas da Partida Solo (v1) e Matemática Financeira
-- **Quantidade de Baralhos:** 1 baralho francês padrão de **52 cartas** (`Deck.TOTAL_CARTAS_PADRAO = 52`), embaralhado com `SecureRandom` em produção e injetável com `Random` / sequência determinística nos testes.
+- **Quantidade de Baralhos:** 1 baralho francês padrão de **52 cartas** (`Deck.TOTAL_CARTAS_PADRAO = 52`), embaralhado com `SecureRandom` em produção e estritamente determinístico quando injetado nos testes (`BlackjackGame(saldo, deck)`).
 - **Comportamento do Dealer no 17 (incluindo *Soft 17*):** o dealer compra cartas enquanto sua pontuação for menor que 17 e **para em todo 17 ou superior** (*Dealer stands on all 17s*, tanto *hard 17* quanto *soft 17*, ex.: Ás + 6 = 17 → para).
-- **Blackjack Natural vs. 21 Comum e Empate (Push):**
-  - **Blackjack Natural** ocorre exclusivamente com **exatamente 2 cartas** somando 21 (1 Ás + 1 carta de valor 10). Mãos de 3 ou mais cartas somando 21 são tratadas como **21 comum**.
-  - Se ambos (jogador e dealer) obtiverem Blackjack Natural nas 2 cartas iniciais, o resultado é `EMPATE_PUSH` (devolução integral da aposta).
-  - Não há *split*, *seguro (insurance)*, *double down* ou *surrender* nesta primeira versão.
-- **Fichas Virtuais em `long` e Prevenção de Overflow:** saldo e apostas utilizam o tipo primitivo `long`, validando limites e empregando aritmética verificada (`Math.addExact` / `Math.multiplyExact`) nos cálculos de liquidação.
-- **Regra da Aposta Par:** para garantir que o pagamento padrão de Blackjack 3:2 seja efetuado por divisão inteira exata sem truncamento ou centavos perdidos:
-  $$\text{Retorno} = \text{aposta} + \frac{\text{aposta} \times 3}{2}$$
-  O método `iniciarPartida(long valorAposta)` **aceita exclusivamente valores estritamente positivos e pares** (`valorAposta % 2 == 0`). Apostas ímpares devem ser rejeitadas retornando `false`.
-- **Liquidação Única:** a aposta é debitada do saldo no momento em que `iniciarPartida` é chamado. O crédito do prêmio é processado **exatamente uma única vez** no momento da transição para o estado `FINALIZADA`.
+- **Atomicidade no Esgotamento Determinístico:** caso um baralho injetado acabe no meio das compras da banca em `parar()`, o motor restaura as cartas ao topo e preserva intactos o estado `TURNO_JOGADOR`, a carta oculta, a mão da banca e o saldo.
+- **Fichas Virtuais em `long` e Regra da Aposta Par:** saldo e apostas usam `long` com `Math.addExact`, `Math.subtractExact` e `Math.multiplyExact`. `iniciarPartida(long valorAposta)` exige aposta estritamente positiva e par (`valorAposta % 2 == 0`) para pagamento 3:2 exato sem truncamento:
+  $$\text{Retorno} = \text{aposta} + \frac{\text{aposta}}{2} \times 3$$
+- **Liquidação Única:** a aposta é debitada ao iniciar a partida e o retorno é creditado exatamente uma única vez na transição para `FINALIZADA`.
 
-### 3. Visibilidade Segura e Proteção contra Vazamento de Cartas
-- Durante o `TURNO_JOGADOR`, a interface precisa saber que há uma segunda carta na mesa virada para baixo, mas **não pode ter acesso à carta oculta** antes da sua revelação:
-  - `getCartasVisiveisDealer()` retorna apenas a primeira carta visível durante o turno do jogador.
-  - `hasCartaOcultaDealer()` retorna `true` durante o turno do jogador, permitindo à View desenhar o verso da carta.
-  - Somente após o jogador parar (`parar()`) ou a rodada transitar para `FINALIZADA`, `getCartasVisiveisDealer()` passa a retornar todas as cartas da banca e `hasCartaOcultaDealer()` passa a retornar `false`.
-- **Imutabilidade:** tanto `getMaoJogador()` quanto `getCartasVisiveisDealer()` retornam listas protegidas por `Collections.unmodifiableList`, impedindo que a interface modifique as coleções internas do motor.
+### 3. Visibilidade Segura e Imutabilidade
+- Durante `TURNO_JOGADOR`, `getCartasVisiveisDealer()` expõe apenas a 1ª carta aberta (`List.copyOf`) e `hasCartaOcultaDealer()` retorna `true`. Somente em `FINALIZADA` todas as cartas da banca são reveladas.
 
 ### 4. Matriz de Ações Permitidas por Estado
 
 | Ação | `AGUARDANDO_APOSTA` | `TURNO_JOGADOR` | `FINALIZADA` |
 |---|---|---|---|
-| `iniciarPartida(valorAposta)` | **Permitido** (deve ser par e $\le$ saldo) | **Proibido** (retorna `false`) | **Permitido** (inicia nova rodada) |
+| `iniciarPartida(valorAposta)` | **Permitido** (par e $\le$ saldo) | **Proibido** (retorna `false`) | **Permitido** (inicia nova rodada) |
 | `pedirCarta()` (Hit) | **Proibido** (retorna `false`) | **Permitido** (se estourar $\to$ `FINALIZADA`) | **Proibido** (retorna `false`) |
 | `parar()` (Stand) | **Proibido** (sem efeito) | **Permitido** (dealer joga $\to$ `FINALIZADA`) | **Proibido** (sem efeito) |
 
-### 5. Código da Interface `BlackjackEngine`
+---
 
-```java
-package model;
+## Expansão Multijogos no Salão: Mesa e Interface Completa de Truco Paulista
 
-import java.util.List;
+Além do Blackjack, o salão conta com a **Mesa de Truco Paulista** 100% funcional:
+- **Reaproveitamento de `CasinoTable`:** `gameName = "Truco"`, base sólida `80x50` em `(320, 280)` no setor sudeste do salão, com plaqueta visual `"TRUCO"`.
+- **Critério Unificado de Proximidade:** raio de alcance de `35 px` com desempate determinístico pela menor distância euclidiana ao quadrado (`getDistanceSqToPlayer(player)`).
+- **Interface Interativa (`TrucoTableView` em `GameState.MENU_TRUCO`):**
+  - Exibe feltro azul anil, carta **Vira** aberta, indicação da **Manilha** da mão, cartas jogadas na vaza atual, placar das 3 vazas e versos fechados das cartas restantes do Bot (sem vazamento da mão secreta).
+  - Permite jogar clicando nas cartas abertas da mão ou pelos atalhos `1`, `2`, `3`, iniciar nova mão com `N` após o desfecho e alternar com `B` / `E` preservando a mesma instância de `TrucoRound` em andamento.
 
-public interface BlackjackEngine {
-    boolean iniciarPartida(long valorAposta);
-    boolean pedirCarta();
-    void parar();
-
-    long getSaldoVirtual();
-    long getApostaAtual();
-    RoundState getEstadoRodada();
-    RoundResult getResultadoRodada();
-
-    List<Card> getMaoJogador();
-    List<Card> getCartasVisiveisDealer();
-    boolean hasCartaOcultaDealer();
-    int getPontosJogador();
-    int getPontosDealerVisiveis();
-}
-```
+### Regras Oficiais do Motor `TrucoRound` (`model`)
+- **Baralho Limpo (40 cartas):** exclui 8, 9 e 10 (`TrucoDeck`).
+- **Força das Cartas Comuns:**
+  $$4 < 5 < 6 < 7 < \text{Q} < \text{J} < \text{K} < \text{A} < 2 < 3$$
+  Cartas comuns de mesmo valor empatam a vaza (*canga*).
+- **Manilhas (Vira Cíclica e Tombos):** rank imediatamente seguinte ao da vira ($3 \to 4$), desempatadas obrigatoriamente por naipe:
+  $$\text{Paus (Zap)} > \text{Copas (Copeta)} > \text{Espadas (Espadilha)} > \text{Ouros (Picafumo)}$$
+- **Resolução Completa de 3 Vazas e IA Honesta (`TrucoSimpleAI`):** cobre vitórias 2x0, 2x1 e todos os desempates de *canga* na 1ª, 2ª ou 3ª vaza; o Bot decide apenas com base na própria mão, na vira e na carta aberta na vaza atual.
 
 ---
 
-## Expansão Multijogos no Salão: Mesa de Truco e Seleção Contextual
+## Guia Rápido de Apresentação e Defesa (Prova Prática)
 
-Para enriquecer a ambientação do cassino e suportar futuros jogos, foi adicionada a **Mesa de Truco**:
-- **Reaproveitamento de `CasinoTable`:** a mesa utiliza a classe `CasinoTable` com `gameName = "Truco"`, base sólida $80 \times 50$ em $(320, 280)$ no setor sudeste do salão, garantindo ampla área de circulação e rotas desimpedidas entre Blackjack, balcão e descanso.
-- **Identificação Visual na Mesa:** renderização de letreiro/plaqueta estilizada acima da mesa indicando o jogo correspondente ("BLACKJACK" ou "TRUCO").
-- **Critério Unificado de Proximidade:**
-  - Se apenas uma mesa estiver no raio de alcance ($35\text{ px}$), ela se torna `mesaAtiva`.
-  - Se ambas estiverem ao alcance do avatar, o método `getDistanceSqToPlayer(player)` desempata selecionando deterministicamente a mesa com menor distância euclidiana ao quadrado.
-  - Se nenhuma estiver ao alcance, `mesaAtiva = null`, ocultando o balcão de interação e ignorando toques em `E`.
-- **Prompt Dinâmico:** o aviso exibe `E — Interagir com a mesa de [Jogo]`.
-- **Tela Provisória ("Truco em desenvolvimento"):** implementada em `GameState.MENU_TRUCO`, com painel de feltro azul marinho, moldura dourada, aviso em português, atalhos informativos e botão interativo de retorno ao salão (tecla `B` ou clique do mouse).
-- **Atalhos Globais:** `ESC` permanece encerrando a aplicação imediatamente em qualquer estado; `B` e `E` alternam entre a mesa e o salão.
+### 1. Exemplos Diretos dos 4 Pilares no Código
+1. **Abstração:** `MyShape` é `abstract` com `draw(Graphics2D)` abstrato; `BlackjackEngine` abstrai o motor da mesa de Blackjack.
+2. **Encapsulamento:** validação de dimensões positivas em `MyShape`, invariantes 1:1 em `MySquare`/`MyCircle`, snapshots imutáveis `List.copyOf` em `Deck`/`Hand`/`TrucoRound` e proteção da carta oculta do dealer em `BlackjackGame`.
+3. **Herança:** `MyRectangle`, `MyEllipse` e `MyCharacter` estendem `MyShape`; `MySquare`, `CasinoTable`, `CasinoCounter` e `CasinoChair` estendem `MyRectangle`; `MyCircle` estende `MyEllipse`.
+4. **Polimorfismo:** `ScreenSaver` ordena `List<MyShape> entidadesRenderizaveis` por `getDepthZ()` e invoca `entidade.draw(g2d)` em laço único; `BlackjackTableView` renderiza qualquer implementação de `BlackjackEngine`.
 
----
-
-## Motor de Regras do Truco Paulista (Etapa 1 - Model)
-
-Para dar suporte à futura mesa de Truco do salão, foi implementado o motor de regras oficial do **Truco Paulista**, completamente desacoplado de qualquer dependência visual de Swing/UI.
-
-### 1. Baralho Limpo e Hierarquia de Cartas
-- **Baralho Limpo (40 cartas):** exclusão de 8, 9 e 10 de todos os naipes (`TrucoDeck`).
-- **Força das Cartas Comuns (não-manilhas):**
-  $$4 < 5 < 6 < 7 < \text{Dama (Q)} < \text{Valete (J)} < \text{Rei (K)} < \text{Ás (A)} < 2 < 3$$
-  Naipes não desempatam cartas comuns: cartas de mesmo valor resultam em empate na vaza (*canga* / *empacho*).
-- **Sequência Cíclica da Vira para a Manilha:**
-  A manilha é sempre o rank imediatamente seguinte ao da carta vira aberta na mesa:
-  $$4 \to 5 \to 6 \to 7 \to \text{Q} \to \text{J} \to \text{K} \to \text{A} \to 2 \to 3 \to 4$$
-  A virada do 3 define o 4 como a maior manilha do jogo.
-- **Desempate Exclusivo de Manilhas (Os Quatro Tombos):**
-  Quando duas ou mais manilhas (mesmo rank) se enfrentam, o desempate é obrigatório pela força dos naipes:
-  $$\text{Paus (4 - Zap)} > \text{Copas (3 - Copeta)} > \text{Espadas (2 - Espadilha)} > \text{Ouros (1 - Picafumo)}$$
-  Duas manilhas **nunca empatam**.
-
-### 2. Tabela Oficial de Resolução de Vazas da Mão
-
-Uma mão de Truco é disputada em melhor de até 3 vazas entre o Jogador e o Bot:
-
-| Vaza 1 | Vaza 2 | Vaza 3 | Vencedor da Mão | Regra / Justificativa |
-|---|---|---|---|---|
-| **J** | **J** | — | **JOGADOR** | Encerramento antecipado por 2x0 |
-| **B** | **B** | — | **BOT** | Encerramento antecipado por 0x2 |
-| **J** | **B** | **J** | **JOGADOR** | Vitória por 2x1 na terceira vaza |
-| **J** | **B** | **B** | **BOT** | Vitória por 1x2 na terceira vaza |
-| **B** | **J** | **J** | **JOGADOR** | Vitória por 2x1 na terceira vaza |
-| **B** | **J** | **B** | **BOT** | Vitória por 1x2 na terceira vaza |
-| **E** | **J** | — | **JOGADOR** | Empate na 1ª: quem vencer a 2ª leva a mão antecipadamente |
-| **E** | **B** | — | **BOT** | Empate na 1ª: quem vencer a 2ª leva a mão antecipadamente |
-| **J** | **E** | — | **JOGADOR** | Empate na 2ª: quem venceu a 1ª leva a mão antecipadamente |
-| **B** | **E** | — | **BOT** | Empate na 2ª: quem venceu a 1ª leva a mão antecipadamente |
-| **J** | **B** | **E** | **JOGADOR** | Empate na 3ª: quem venceu a 1ª leva a mão |
-| **B** | **J** | **E** | **BOT** | Empate na 3ª: quem venceu a 1ª leva a mão |
-| **E** | **E** | **J** | **JOGADOR** | Duas primeiras empatadas: 3ª decide a mão |
-| **E** | **E** | **B** | **BOT** | Duas primeiras empatadas: 3ª decide a mão |
-| **E** | **E** | **E** | **EMPATE** | Três empates seguidos: mão anulada/sem vencedor |
-
-### 3. Quem Começa Cada Vaza
-- **Vaza 1:** Começa o jogador definido como `primeiroDaMao`.
-- **Vazas 2 e 3:**
-  - Se a vaza anterior teve vencedor: o **vencedor da vaza anterior** joga primeiro.
-  - Se a vaza anterior empatou (*canga*): **quem começou a vaza empatada** continua começando a vaza seguinte.
-
-### 4. Inteligência do Bot Simples com Visibilidade Estrita
-- **Isolamento de Estado:** a IA (`TrucoSimpleAI`) recebe única e exclusivamente a sua própria lista de cartas na mão, a vira pública e a carta já aberta pelo adversário na vaza atual (se houver). NUNCA tem acesso às cartas ocultas do jogador humano.
-- **Estratégia de Recursos:**
-  - Ao abrir a vaza: joga a sua menor carta para sondar a rodada sem gastar cartas altas.
-  - Ao responder: se tiver cartas que vencem a do adversário, escolhe a menor entre as vencedoras (economizando manilhas e cartas mais fortes). Se não puder vencer, prioriza empatar a vaza (*cangar*). Se não puder nem vencer nem empatar, descarta sua menor carta (lixo).
+### 2. Alterações Simples ao Vivo (Treino da Dupla)
+- **Guilherme (Motor de Regras):** fazer o dealer comprar também em *Soft 17* em `BlackjackGame.parar()` usando `maoDealerSimulada.isMaoSoft()`, ou alterar o multiplicador de pagamento do Blackjack em `BlackjackGame`.
+- **Enzo (Mundo e Interface):** adicionar uma nova `CasinoChair` sólida ao salão em `ScreenSaver.inicializarEntidades()` (herdando colisão e *z-sorting* automaticamente) ou ajustar `VELOCIDADE_AVATAR`.
 
 ---
 
-## Fluxo Git da Dupla
+## Fluxo Git e Comandos de Verificação
 
-1. **Branch de Contrato Compartilhada:** `feat/regras-contrato` (contém o contrato oficial compilado, tipos de dados imutáveis e testes automatizados).
-2. **Para o Colega Iniciar:**
-   ```bash
-   git fetch origin
-   git checkout feat/regras-contrato
-   git checkout -b feat/regras-<nome-da-tarefa>
-   ```
-3. **Padrão Obrigatório de Commits:**
-   `tipo(escopo): descrição curta em português`
-   Tipos: `feat`, `fix`, `refactor`, `test`, `docs`, `chore`.
-4. **Revisão:**
-   Cada integrante abre Pull Request ou submete sua branch para revisão do colega antes de qualquer merge.
+- **Padrão Obrigatório de Commits:** `tipo(escopo): descrição curta em português` (`feat`, `fix`, `refactor`, `test`, `docs`, `chore`).
+- **Compilação e Execução de Todas as 9 Suítes (PowerShell):**
+  ```powershell
+  New-Item -ItemType Directory -Force -Path bin | Out-Null
+  $arquivos = Get-ChildItem -Path src,tests -Recurse -Filter *.java | ForEach-Object { $_.FullName }
+  javac -encoding UTF-8 -d bin -cp src $arquivos
 
+  java -cp "bin;src" tests.TestePOO
+  java -cp "bin;src" tests.TesteRenderizacao
+  java -cp "bin;src" tests.TesteContratoBlackjack
+  java -cp "bin;src" tests.TesteBaralhoEMao
+  java -cp "bin;src" tests.TesteMotorBlackjack
+  java -cp "bin;src" tests.TesteIntegracaoMesaBlackjack
+  java -cp "bin;src" tests.TesteInterfaceBlackjack
+  java -cp "bin;src" tests.TesteTrucoPaulista
+  java -cp "bin;src" tests.TesteInterfaceTruco
+  ```
