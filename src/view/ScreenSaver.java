@@ -9,6 +9,7 @@ import model.MyRectangle;
 import model.MyShape;
 
 import java.awt.BasicStroke;
+import java.awt.GradientPaint;
 
 import javax.swing.AbstractAction;
 import javax.swing.ActionMap;
@@ -51,7 +52,8 @@ public class ScreenSaver extends JPanel implements ActionListener {
 
     public enum GameState {
         SALAO,
-        MENU_BLACKJACK
+        MENU_BLACKJACK,
+        MENU_TRUCO
     }
 
     private GameState estadoAtual = GameState.SALAO;
@@ -63,6 +65,8 @@ public class ScreenSaver extends JPanel implements ActionListener {
     // Entidades
     private MyCharacter player;
     private CasinoTable mesaBlackjack;
+    private CasinoTable mesaTruco;
+    private CasinoTable mesaAtiva;
     private CasinoCounter balcao;
     private List<CasinoChair> cadeiras;
     private List<MyShape> obstaculos;
@@ -118,7 +122,10 @@ public class ScreenSaver extends JPanel implements ActionListener {
 
         // Cria a mesa de Blackjack com seu footprint de base sólida no chão
         String spriteMesa = "src/image/table.png";
-        this.mesaBlackjack = new CasinoTable(160, 160, 80, 50, spriteMesa, "Blackjack Solo", 0, 0);
+        this.mesaBlackjack = new CasinoTable(160, 160, 80, 50, spriteMesa, "Blackjack", 0, 0);
+
+        // Cria a mesa de Truco em área ampla com circulação livre
+        this.mesaTruco = new CasinoTable(320, 280, 80, 50, spriteMesa, "Truco", 0, 0);
 
         // Cria o balcão do bar com footprint sólido na lateral norte
         this.balcao = new CasinoCounter(110, 40, 80, 30, "BAR", 0, 0);
@@ -134,6 +141,7 @@ public class ScreenSaver extends JPanel implements ActionListener {
 
         // Adiciona à lista de obstáculos para colisão física no solo
         this.obstaculos.add(this.mesaBlackjack);
+        this.obstaculos.add(this.mesaTruco);
         this.obstaculos.add(this.balcao);
         for (CasinoChair c : this.cadeiras) {
             this.obstaculos.add(c);
@@ -141,6 +149,7 @@ public class ScreenSaver extends JPanel implements ActionListener {
 
         // Adiciona à lista heterogênea polimórfica de renderização com Z-sorting
         this.entidadesRenderizaveis.add(this.mesaBlackjack);
+        this.entidadesRenderizaveis.add(this.mesaTruco);
         this.entidadesRenderizaveis.add(this.balcao);
         for (CasinoChair c : this.cadeiras) {
             this.entidadesRenderizaveis.add(c);
@@ -173,9 +182,22 @@ public class ScreenSaver extends JPanel implements ActionListener {
         if (estadoAtual == GameState.MENU_BLACKJACK && blackjackTableView != null) {
             boolean sairParaSalao = blackjackTableView.processarClique(x, y);
             if (sairParaSalao) {
-                player.playSound();
-                estadoAtual = GameState.SALAO;
-                teclasPressionadas.clear();
+                processarRetornoB();
+            }
+        } else if (estadoAtual == GameState.MENU_TRUCO) {
+            int w = getWidth();
+            int h = getHeight();
+            int painelW = Math.min(800, Math.max(400, w - 80));
+            int painelH = Math.min(500, Math.max(300, h - 80));
+            int px = (w - painelW) / 2;
+            int py = (h - painelH) / 2;
+            int btnW = 260;
+            int btnH = 48;
+            int btnX = px + (painelW - btnW) / 2;
+            int btnY = py + painelH - 85;
+
+            if (x >= btnX && x <= btnX + btnW && y >= btnY && y <= btnY + btnH) {
+                processarRetornoB();
             }
         }
     }
@@ -243,16 +265,12 @@ public class ScreenSaver extends JPanel implements ActionListener {
         configurarTeclaAtalhoMesa(im, am, "2", "FICHA_2");
         configurarTeclaAtalhoMesa(im, am, "3", "FICHA_3");
 
-        // Tecla B para retornar ao salao a partir da mesa de Blackjack
+        // Tecla B para retornar ao salao a partir de qualquer mesa
         im.put(KeyStroke.getKeyStroke("pressed B"), "acaoB");
         am.put("acaoB", new AbstractAction() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                if (estadoAtual == GameState.MENU_BLACKJACK) {
-                    player.playSound();
-                    estadoAtual = GameState.SALAO;
-                    teclasPressionadas.clear();
-                }
+                processarRetornoB();
             }
         });
 
@@ -319,18 +337,52 @@ public class ScreenSaver extends JPanel implements ActionListener {
         });
     }
 
-    private void processarInteracaoE() {
-        if (estadoAtual == GameState.SALAO) {
-            if (proximoDaMesa) {
-                player.playSound();
-                estadoAtual = GameState.MENU_BLACKJACK;
-                teclasPressionadas.clear();
-            }
-        } else if (estadoAtual == GameState.MENU_BLACKJACK) {
+    public void processarRetornoB() {
+        if (estadoAtual == GameState.MENU_BLACKJACK || estadoAtual == GameState.MENU_TRUCO) {
             player.playSound();
             estadoAtual = GameState.SALAO;
             teclasPressionadas.clear();
         }
+    }
+
+    public void processarInteracaoE() {
+        if (estadoAtual == GameState.SALAO) {
+            if (mesaAtiva != null) {
+                player.playSound();
+                if ("Truco".equalsIgnoreCase(mesaAtiva.getGameName())) {
+                    estadoAtual = GameState.MENU_TRUCO;
+                } else {
+                    estadoAtual = GameState.MENU_BLACKJACK;
+                }
+                teclasPressionadas.clear();
+            }
+        } else if (estadoAtual == GameState.MENU_BLACKJACK || estadoAtual == GameState.MENU_TRUCO) {
+            player.playSound();
+            estadoAtual = GameState.SALAO;
+            teclasPressionadas.clear();
+        }
+    }
+
+    /**
+     * Determina de forma unificada qual mesa está ao alcance do jogador.
+     * Se ambas estiverem ao alcance, seleciona a que tiver menor distância física.
+     */
+    public void atualizarMesaMaisProxima() {
+        boolean pertoBlackjack = mesaBlackjack != null && mesaBlackjack.isPlayerNear(player, 35);
+        boolean pertoTruco = mesaTruco != null && mesaTruco.isPlayerNear(player, 35);
+
+        if (pertoBlackjack && pertoTruco) {
+            double distB = mesaBlackjack.getDistanceSqToPlayer(player);
+            double distT = mesaTruco.getDistanceSqToPlayer(player);
+            this.mesaAtiva = (distB <= distT) ? mesaBlackjack : mesaTruco;
+        } else if (pertoBlackjack) {
+            this.mesaAtiva = mesaBlackjack;
+        } else if (pertoTruco) {
+            this.mesaAtiva = mesaTruco;
+        } else {
+            this.mesaAtiva = null;
+        }
+        this.proximoDaMesa = (this.mesaAtiva != null);
     }
 
     /**
@@ -377,6 +429,9 @@ public class ScreenSaver extends JPanel implements ActionListener {
 
         player.updateOrigins(originX, originY);
         mesaBlackjack.updateOrigins(originX, originY);
+        if (mesaTruco != null) {
+            mesaTruco.updateOrigins(originX, originY);
+        }
         if (balcao != null) {
             balcao.updateOrigins(originX, originY);
         }
@@ -403,8 +458,8 @@ public class ScreenSaver extends JPanel implements ActionListener {
             // Movimentação com vetor normalizado, velocidade constante e colisão com deslizamento
             player.moveIsometric(dirSx, dirSy, VELOCIDADE_AVATAR, dt, WORLD_SIZE, WORLD_SIZE, obstaculos);
 
-            // Verifica proximidade da mesa para interação
-            this.proximoDaMesa = mesaBlackjack.isPlayerNear(player, 35);
+            // Seleção unificada da mesa mais próxima para interação
+            atualizarMesaMaisProxima();
         }
     }
 
@@ -417,8 +472,10 @@ public class ScreenSaver extends JPanel implements ActionListener {
 
         if (estadoAtual == GameState.SALAO) {
             desenharSalao(g2d);
-        } else {
+        } else if (estadoAtual == GameState.MENU_BLACKJACK) {
             desenharMenuBlackjack(g2d);
+        } else if (estadoAtual == GameState.MENU_TRUCO) {
+            desenharMenuTruco(g2d);
         }
 
         g2d.dispose();
@@ -672,17 +729,20 @@ public class ScreenSaver extends JPanel implements ActionListener {
     }
 
     private void desenharBalcaoInteracao(Graphics2D g2d) {
+        if (mesaAtiva == null) {
+            return;
+        }
         int cx = getWidth() / 2;
         int cy = getHeight() - 100;
 
         g2d.setColor(new Color(0, 0, 0, 210));
-        g2d.fillRoundRect(cx - 160, cy - 25, 320, 50, 15, 15);
+        g2d.fillRoundRect(cx - 190, cy - 25, 380, 50, 15, 15);
         g2d.setColor(new Color(255, 215, 0));
-        g2d.drawRoundRect(cx - 160, cy - 25, 320, 50, 15, 15);
+        g2d.drawRoundRect(cx - 190, cy - 25, 380, 50, 15, 15);
 
         g2d.setFont(new Font("SansSerif", Font.BOLD, 15));
         g2d.setColor(Color.YELLOW);
-        String texto = "[ E ] - Interagir com a Mesa de Blackjack";
+        String texto = "E — Interagir com a mesa de " + mesaAtiva.getGameName();
         FontMetrics fm = g2d.getFontMetrics();
         g2d.drawString(texto, cx - (fm.stringWidth(texto) / 2), cy + 6);
     }
@@ -694,6 +754,112 @@ public class ScreenSaver extends JPanel implements ActionListener {
         if (blackjackTableView != null) {
             blackjackTableView.render(g2d, getWidth(), getHeight());
         }
+    }
+
+    /**
+     * Renderiza a tela provisória da mesa de Truco em desenvolvimento.
+     */
+    private void desenharMenuTruco(Graphics2D g2d) {
+        int w = getWidth();
+        int h = getHeight();
+
+        // Fundo escuro de cassino
+        GradientPaint gradFundo = new GradientPaint(
+                0, 0, new Color(10, 20, 30),
+                0, h, new Color(5, 10, 18)
+        );
+        g2d.setPaint(gradFundo);
+        g2d.fillRect(0, 0, w, h);
+
+        // Painel central de feltro com moldura dourada
+        int painelW = Math.min(800, Math.max(400, w - 80));
+        int painelH = Math.min(500, Math.max(300, h - 80));
+        int px = (w - painelW) / 2;
+        int py = (h - painelH) / 2;
+
+        // Sombra do painel
+        g2d.setColor(new Color(0, 0, 0, 140));
+        g2d.fillRoundRect(px + 8, py + 8, painelW, painelH, 24, 24);
+
+        // Feltro azul escuro temático de Truco
+        GradientPaint gradFeltro = new GradientPaint(
+                px, py, new Color(18, 55, 85),
+                px, py + painelH, new Color(10, 32, 50)
+        );
+        g2d.setPaint(gradFeltro);
+        g2d.fillRoundRect(px, py, painelW, painelH, 24, 24);
+
+        // Borda dourada chanfrada
+        g2d.setStroke(new BasicStroke(3.0f));
+        g2d.setColor(new Color(255, 215, 0));
+        g2d.drawRoundRect(px, py, painelW, painelH, 24, 24);
+        g2d.setColor(new Color(218, 165, 32, 120));
+        g2d.drawRoundRect(px + 6, py + 6, painelW - 12, painelH - 12, 18, 18);
+
+        // Faixa de cabeçalho
+        g2d.setColor(new Color(0, 0, 0, 120));
+        g2d.fillRoundRect(px + 20, py + 20, painelW - 40, 70, 14, 14);
+        g2d.setColor(new Color(255, 215, 0));
+        g2d.drawRoundRect(px + 20, py + 20, painelW - 40, 70, 14, 14);
+
+        g2d.setFont(new Font("SansSerif", Font.BOLD, 24));
+        FontMetrics fmTitulo = g2d.getFontMetrics();
+        String titulo = "★ TRUCO PAULISTA / MINEIRO ★";
+        g2d.setColor(Color.YELLOW);
+        g2d.drawString(titulo, px + (painelW - fmTitulo.stringWidth(titulo)) / 2, py + 52);
+
+        g2d.setFont(new Font("SansSerif", Font.PLAIN, 13));
+        g2d.setColor(new Color(200, 230, 255));
+        String sub = "Mesa de Cartas do Cassino Social";
+        FontMetrics fmSub = g2d.getFontMetrics();
+        g2d.drawString(sub, px + (painelW - fmSub.stringWidth(sub)) / 2, py + 74);
+
+        // Banner central informativo
+        int bannerY = py + 110;
+        int bannerH = Math.min(220, painelH - 220);
+        g2d.setColor(new Color(0, 0, 0, 100));
+        g2d.fillRoundRect(px + 30, bannerY, painelW - 60, bannerH, 16, 16);
+
+        g2d.setFont(new Font("SansSerif", Font.BOLD, 22));
+        g2d.setColor(new Color(255, 140, 0));
+        String msgStatus = "Truco em desenvolvimento";
+        FontMetrics fmStatus = g2d.getFontMetrics();
+        g2d.drawString(msgStatus, px + (painelW - fmStatus.stringWidth(msgStatus)) / 2, bannerY + 45);
+
+        g2d.setFont(new Font("SansSerif", Font.PLAIN, 15));
+        g2d.setColor(Color.WHITE);
+        String l1 = "A mesa de Truco foi integrada ao salão isométrico com suporte a colisão e Z-sorting.";
+        String l2 = "As regras completas, manilhas e rodadas serão implementadas nas respectivas frentes.";
+        String l3 = "Pressione B para retornar ao salão ou ESC para encerrar o jogo.";
+        FontMetrics fmL = g2d.getFontMetrics();
+        g2d.drawString(l1, px + (painelW - fmL.stringWidth(l1)) / 2, bannerY + 85);
+        g2d.drawString(l2, px + (painelW - fmL.stringWidth(l2)) / 2, bannerY + 115);
+        g2d.drawString(l3, px + (painelW - fmL.stringWidth(l3)) / 2, bannerY + 150);
+
+        // Botão Voltar ao Salão (B)
+        int btnW = 260;
+        int btnH = 48;
+        int btnX = px + (painelW - btnW) / 2;
+        int btnY = py + painelH - 85;
+
+        g2d.setColor(new Color(30, 110, 60));
+        g2d.fillRoundRect(btnX, btnY, btnW, btnH, 12, 12);
+        g2d.setColor(new Color(255, 215, 0));
+        g2d.setStroke(new BasicStroke(2.0f));
+        g2d.drawRoundRect(btnX, btnY, btnW, btnH, 12, 12);
+
+        g2d.setFont(new Font("SansSerif", Font.BOLD, 16));
+        g2d.setColor(Color.WHITE);
+        String txtBtn = "Voltar ao Salão (B)";
+        FontMetrics fmBtn = g2d.getFontMetrics();
+        g2d.drawString(txtBtn, btnX + (btnW - fmBtn.stringWidth(txtBtn)) / 2, btnY + 30);
+
+        // Rodapé de atalhos
+        g2d.setFont(new Font("SansSerif", Font.PLAIN, 12));
+        g2d.setColor(new Color(180, 200, 220));
+        String rodape = "[ B ] ou [ E ] Voltar ao Salão   |   [ ESC ] Sair do Jogo";
+        FontMetrics fmRodape = g2d.getFontMetrics();
+        g2d.drawString(rodape, px + (painelW - fmRodape.stringWidth(rodape)) / 2, py + painelH - 18);
     }
 
     /**
@@ -721,6 +887,14 @@ public class ScreenSaver extends JPanel implements ActionListener {
 
     public CasinoTable getMesaBlackjack() {
         return mesaBlackjack;
+    }
+
+    public CasinoTable getMesaTruco() {
+        return mesaTruco;
+    }
+
+    public CasinoTable getMesaAtiva() {
+        return mesaAtiva;
     }
 
     public GameState getEstadoAtual() {

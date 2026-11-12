@@ -24,6 +24,8 @@ Consolidar abstração, encapsulamento, herança e polimorfismo em um jogo 2D Ja
 - [x] Sprites PNG reais de avatar e ambiente carregados na memória antes do loop.
 - [x] Áudio WAV de interação pré-carregado com `Clip`, rebobinado (`setFramePosition(0)`) antes da reprodução e liberado no encerramento.
 - [x] Mesa interativa que detecta proximidade (`isPlayerNear`), exibe prompt e abre a tela de transição do Blackjack com botão para voltar ao salão.
+- [x] Mesa de Truco integrada no salão com circulação livre, colisão sólida, identificação visual e tela provisória "Truco em desenvolvimento" (com retorno por B e saída por ESC).
+- [x] Seleção contextual unificada da mesa mais próxima para exibição do prompt ("E — Interagir com a mesa de [Jogo]") e tratamento da tecla E.
 - [ ] Implementação completa das cartas e apostas do Blackjack solo (Etapa 4 - Frente do colega).
 - [ ] Remoção de elementos por laço reverso em coleções dinâmicas de cartas/fichas.
 - [x] Código compila e executa por terminal PowerShell e IDE.
