@@ -12,7 +12,10 @@ import java.util.List;
  *   <li><strong>Baralho:</strong> 1 baralho frances padrao de 52 cartas ({@link Deck}). Em modo de
  *       producao, o baralho e reiniciado e embaralhado com {@code SecureRandom} a cada nova rodada;
  *       em modo deterministico (injetando um {@link Deck} customizado), a sequencia exata fornecida
- *       e consumida sem embaralhamento automatico para permitir testes controlados.</li>
+ *       permanece 100% deterministica do inicio ao fim, sem reposicao aleatoria: caso restem menos de
+ *       4 cartas antes de {@link #iniciarPartida(long)}, a partida e recusada ({@code false}); caso a
+ *       sequencia acabe no meio da rodada ({@link #pedirCarta()} ou turno do dealer em {@link #parar()}),
+ *       o esgotamento e sinalizado explicitamente com {@link IllegalStateException}.</li>
  *   <li><strong>Ordem de distribuicao inicial (4 cartas):</strong>
  *       1a carta -> Jogador (aberta);
  *       2a carta -> Dealer (aberta / visivel);
@@ -105,10 +108,16 @@ public class BlackjackGame implements BlackjackEngine {
      * Cria um motor de Blackjack recebendo um {@link Deck} injetado (por exemplo, com sequencia
      * deterministica de cartas para testes automatizados).
      *
-     * <p>Neste construtor, o baralho injetado <strong>nao e reiniciado nem reembaralhado automaticamente</strong>
-     * ao iniciar a partida, preservando rigorosamente a ordem das cartas configurada pelo teste
-     * (a menos que o baralho possua menos de 4 cartas restantes, caso em que e reiniciado e embaralhado
-     * por seguranca).</p>
+     * <p>Neste construtor, o baralho injetado permanece <strong>estritamente deterministico ate o fim</strong>
+     * (nunca e reiniciado nem reembaralhado automaticamente com cartas aleatorias):</p>
+     * <ul>
+     *   <li>Se restarem <strong>menos de 4 cartas</strong> no momento de {@link #iniciarPartida(long)},
+     *       a nova rodada nao e iniciada (retorna {@code false}), preservando saldo e estado intactos.</li>
+     *   <li>Se as cartas do baralho injetado se esgotarem <strong>durante uma rodada em andamento</strong>
+     *       (ao chamar {@link #pedirCarta()} ou durante as compras obrigatorias do dealer em {@link #parar()}),
+     *       uma {@link IllegalStateException} explicita e lancada, evitando mascarar cenarios de teste incompletos
+     *       com cartas aleatorias.</li>
+     * </ul>
      *
      * @param saldoInicial saldo inicial em fichas virtuais ({@code >= 0}).
      * @param baralhoInjetado instancia de {@link Deck} a utilizar (nao pode ser nula).
@@ -120,10 +129,15 @@ public class BlackjackGame implements BlackjackEngine {
     /**
      * Construtor completo com controle explicito sobre saldo, instancia de baralho e politica de reembaralhamento.
      *
+     * <p>Quando {@code reembaralharAutomaticamentePorRodada} for {@code false}, o {@code baralho} nunca sofre
+     * reposicao aleatoria: {@link #iniciarPartida(long)} retorna {@code false} se houver menos de 4 cartas
+     * disponiveis e compras em meio a rodada lancam {@link IllegalStateException} se o baralho esgotar.</p>
+     *
      * @param saldoInicial                         saldo inicial em fichas virtuais ({@code >= 0}).
      * @param baralho                              baralho de cartas (nao pode ser nulo).
-     * @param reembaralharAutomaticamentePorRodada {@code true} para reiniciar as 52 cartas e embaralhar a cada
-     *                                             nova partida; {@code false} para consumir a sequencia atual do {@code Deck}.
+     * @param reembaralharAutomaticamentePorRodada {@code true} para modo de producao (reinicia as 52 cartas e
+     *                                             embaralha a cada nova partida); {@code false} para modo
+     *                                             estritamente deterministico sem reposicao aleatoria.
      */
     public BlackjackGame(long saldoInicial, Deck baralho, boolean reembaralharAutomaticamentePorRodada) {
         if (saldoInicial < 0L) {
@@ -337,7 +351,12 @@ public class BlackjackGame implements BlackjackEngine {
 
     private Card comprarCartaSegura() {
         if (this.baralho.estaVazio()) {
-            // Caso de contingencia se uma partida longa esgotar o baralho injetado
+            if (!this.reembaralharAutomaticamentePorRodada) {
+                throw new IllegalStateException(
+                        "O baralho deterministico injetado esgotou durante a rodada sem cartas suficientes para concluir a acao."
+                );
+            }
+            // Apenas no modo de producao (com reembaralhamento automatico habilitado) repoe um novo monte embaralhado
             this.baralho.reiniciarBaralhoPadrao();
             this.baralho.embaralhar();
         }
