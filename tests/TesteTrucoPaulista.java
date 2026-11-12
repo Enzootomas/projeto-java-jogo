@@ -477,15 +477,30 @@ public class TesteTrucoPaulista {
         afirme(rodada.getResultadoMao() == resultadoOriginal,
                 "Consultar a vaza nao altera o resultado da mao (continua sendo " + resultadoOriginal + ")");
 
-        // 7. Confirmar que apenas TrucoRound pode registrar jogadas e transitar estado
+        // 7. Guardar a lista antes de uma jogada e confirmar que ela continua com a vaza anterior depois da jogada
+        List<TrucoTrick> listaAntesDaJogada = rodada.getVazas();
+        afirme(listaAntesDaJogada.size() == 1, "Lista antes da jogada possui tamanho 1");
+        afirme(listaAntesDaJogada.get(0).getCartaJogador() == null,
+                "Vaza na lista antes da jogada tem cartaJogador null");
+
+        // Jogador realiza jogada oficial via TrucoRound
         rodada.jogarCartaJogador(maoJ.get(0));
         afirme(rodada.getMaoJogador().size() == 2,
                 "Apenas o ponto de entrada TrucoRound.jogarCartaJogador altera o estado da rodada");
-        afirme(rodada.getVazas().get(0).getCartaJogador().equals(maoJ.get(0)),
-                "Apos jogada oficial via TrucoRound, novo snapshot da vaza 1 reflete a carta jogada");
+
+        // Confirmar que a lista guardada antes CONTINUA com a vaza anterior depois da jogada (graças a List.copyOf)
+        afirme(listaAntesDaJogada.size() == 1,
+                "Lista guardada antes da jogada mantem tamanho 1 (desvinculada da lista interna por List.copyOf)");
+        afirme(listaAntesDaJogada.get(0).getCartaJogador() == null,
+                "Lista guardada antes da jogada continua com a vaza anterior intacta (cartaJogador permanece null)");
         afirme(vazaConsultada.getCartaJogador() == null,
-                "Snapshot obtido anteriormente permanece intacto e imutavel (valor original null)");
-        afirme(rodada.getVazas().size() == 2,
-                "Apos resolucao da vaza 1, TrucoRound iniciou a vaza 2 com novo snapshot imutavel");
+                "Snapshot isolado de vaza obtido anteriormente permanece intacto e imutavel (valor original null)");
+
+        // Confirmar que novas chamadas a getVazas() devolvem a nova fotografia atualizada
+        List<TrucoTrick> listaDepoisDaJogada = rodada.getVazas();
+        afirme(listaDepoisDaJogada.size() == 2,
+                "Nova chamada a getVazas() contem a vaza 2 recem-iniciada (tamanho 2)");
+        afirme(listaDepoisDaJogada.get(0).getCartaJogador().equals(maoJ.get(0)),
+                "Nova chamada a getVazas() contem a vaza 1 com a carta jogada pelo jogador");
     }
 }
