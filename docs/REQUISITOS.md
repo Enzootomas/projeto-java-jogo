@@ -25,6 +25,7 @@ Consolidar abstração, encapsulamento, herança e polimorfismo em um jogo 2D Ja
 - [x] Áudio WAV de interação pré-carregado com `Clip`, rebobinado (`setFramePosition(0)`) antes da reprodução e liberado no encerramento.
 - [x] Mesa interativa que detecta proximidade (`isPlayerNear`), exibe prompt e abre a tela de transição do Blackjack com botão para voltar ao salão.
 - [x] Mesa de Truco integrada no salão com circulação livre, colisão sólida, identificação visual e tela provisória "Truco em desenvolvimento" (com retorno por B e saída por ESC).
+- [x] Motor de regras oficial do Truco Paulista (Etapa 1 - Model): baralho limpo de 40 cartas, vira, manilhas por naipes (Zap, Copeta, Espadilha, Picafumo), resolução de mão de 3 vazas com regras de empate/encerramento antecipado e IA do Bot com visibilidade estrita.
 - [x] Seleção contextual unificada da mesa mais próxima para exibição do prompt ("E — Interagir com a mesa de [Jogo]") e tratamento da tecla E.
 - [ ] Implementação completa das cartas e apostas do Blackjack solo (Etapa 4 - Frente do colega).
 - [ ] Remoção de elementos por laço reverso em coleções dinâmicas de cartas/fichas.
@@ -36,9 +37,11 @@ Consolidar abstração, encapsulamento, herança e polimorfismo em um jogo 2D Ja
 - `src/model/`:
   - `MyShape.java`, `MyRectangle.java`, `MySquare.java`, `MyEllipse.java`, `MyCircle.java` (Geometria e colisões da base).
   - `MyCharacter.java`: avatar do jogador que estende `MyShape`, contendo sprite, direção, animação e áudio.
-  - `CasinoTable.java`: mesa interativa de Blackjack com base de colisão e gatilho de proximidade.
+  - `CasinoTable.java`: mesa interativa de Blackjack e Truco com base de colisão e gatilho de proximidade.
   - `CasinoCounter.java`: balcão do bar com footprint sólido e acabamento amadeirado.
   - `CasinoChair.java`: cadeiras de cassino com footprint quadrado e estofamento vermelho bordô.
+  - `BlackjackEngine.java`, `Card.java`, `Suit.java`, `Rank.java`: contrato e tipos do Blackjack.
+  - `TrucoRules.java`, `TrucoCardComparator.java`, `TrucoDeck.java`, `TrucoPlayer.java`, `TrucoTrick.java`, `TrucoTrickResult.java`, `TrucoHandResult.java`, `TrucoSimpleAI.java`, `TrucoRound.java`: motor e regras do Truco Paulista.
   - `BlackjackGame.java`: regras da partida solo contra o crupiê (fichas virtuais).
 - `src/view/ScreenSaver.java` (ou painel do cassino): renderização isométrica, paredes, portal, tapete, z-sorting, loop do jogo (`Timer` a 60 FPS) e escuta de teclado.
 - `src/image/` e `src/sound/`: recursos gráficos (pixel art) e efeitos sonoros WAV.
