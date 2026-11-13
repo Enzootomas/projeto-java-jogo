@@ -44,8 +44,14 @@ Para garantir que o colega possa desenvolver o motor do Blackjack e Enzo possa d
   - `EMPATE_PUSH`: empate na pontuação final. Devolve a aposta original integralmente.
   - `JOGADOR_ESTOUROU` / `DEALER_VITORIA` / `DEALER_BLACKJACK`: derrota do jogador (retorno 0).
 
-### 2. Regras Financeiras e Pagamento 3:2 sem Arredondamento
-- **Fichas Virtuais em `long`:** saldo e apostas utilizam o tipo primitivo `long` para suportar grandes volumes sem risco de overflow.
+### 2. Regras Específicas da Partida Solo (v1) e Matemática Financeira
+- **Quantidade de Baralhos:** 1 baralho francês padrão de **52 cartas** (`Deck.TOTAL_CARTAS_PADRAO = 52`), embaralhado com `SecureRandom` em produção e injetável com `Random` / sequência determinística nos testes.
+- **Comportamento do Dealer no 17 (incluindo *Soft 17*):** o dealer compra cartas enquanto sua pontuação for menor que 17 e **para em todo 17 ou superior** (*Dealer stands on all 17s*, tanto *hard 17* quanto *soft 17*, ex.: Ás + 6 = 17 → para).
+- **Blackjack Natural vs. 21 Comum e Empate (Push):**
+  - **Blackjack Natural** ocorre exclusivamente com **exatamente 2 cartas** somando 21 (1 Ás + 1 carta de valor 10). Mãos de 3 ou mais cartas somando 21 são tratadas como **21 comum**.
+  - Se ambos (jogador e dealer) obtiverem Blackjack Natural nas 2 cartas iniciais, o resultado é `EMPATE_PUSH` (devolução integral da aposta).
+  - Não há *split*, *seguro (insurance)*, *double down* ou *surrender* nesta primeira versão.
+- **Fichas Virtuais em `long` e Prevenção de Overflow:** saldo e apostas utilizam o tipo primitivo `long`, validando limites e empregando aritmética verificada (`Math.addExact` / `Math.multiplyExact`) nos cálculos de liquidação.
 - **Regra da Aposta Par:** para garantir que o pagamento padrão de Blackjack 3:2 seja efetuado por divisão inteira exata sem truncamento ou centavos perdidos:
   $$\text{Retorno} = \text{aposta} + \frac{\text{aposta} \times 3}{2}$$
   O método `iniciarPartida(long valorAposta)` **aceita exclusivamente valores estritamente positivos e pares** (`valorAposta % 2 == 0`). Apostas ímpares devem ser rejeitadas retornando `false`.

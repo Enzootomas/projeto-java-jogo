@@ -42,7 +42,8 @@ public class TesteRenderizacao {
         afirme(pixelPiso != 0, "Salao isometrico renderizou piso com sucesso (Pixel: 0x" + Integer.toHexString(pixelPiso) + ")");
         afirme(pixelHud != 0, "HUD do salao renderizou com sucesso (Pixel: 0x" + Integer.toHexString(pixelHud) + ")");
 
-        // 2. Testa Renderização da Mesa de Blackjack (Estado: AGUARDANDO_APOSTA)
+        // 2. Testa Renderização da Mesa de Blackjack (usando o simulador mantido para testes de interface)
+        painel.setBlackjackEngine(new BlackjackMockSimulator());
         BlackjackMockSimulator simulador = (BlackjackMockSimulator) painel.getBlackjackEngine();
         BlackjackTableView mesaView = painel.getBlackjackTableView();
 

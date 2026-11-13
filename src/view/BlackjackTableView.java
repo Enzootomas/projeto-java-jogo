@@ -1,6 +1,7 @@
 package view;
 
 import model.BlackjackEngine;
+import model.BlackjackGame;
 import model.Card;
 import model.RoundResult;
 import model.RoundState;
@@ -214,8 +215,16 @@ public class BlackjackTableView {
         switch (res) {
             case JOGADOR_BLACKJACK:
                 corBorda = new Color(255, 215, 0);
+                long apostaBJ = engine.getApostaAtual();
+                long lucroBJ;
+                if (engine instanceof BlackjackGame) {
+                    lucroBJ = ((BlackjackGame) engine).getLucroLiquidoUltimaRodada();
+                } else {
+                    // Aposta é garantidamente par no contrato; divide por 2 antes de multiplicar por 3 para evitar overflow intermediário
+                    lucroBJ = Math.multiplyExact(apostaBJ / 2L, 3L);
+                }
                 texto = "★ BLACKJACK NATURAL! PAGAMENTO 3:2 (+ " +
-                        formatadorMoeda.format((engine.getApostaAtual() * 3) / 2) + " FICHAS) ★";
+                        formatadorMoeda.format(lucroBJ) + " FICHAS) ★";
                 break;
             case JOGADOR_VITORIA:
                 corBorda = new Color(46, 204, 113);
