@@ -238,3 +238,44 @@ classDiagram
 - **Ocultação Segura:** durante `TURNO_JOGADOR`, `getCartasVisiveisDealer()` retorna `maoDealer.getPrimeirasCartas(1)` (`List.copyOf`), impedindo qualquer vazamento da segunda carta oculta até a transição para `FINALIZADA`.
 - **Liquidação Única e Prevenção de Overflow:** a flag `rodadaLiquidada` garante que o crédito de fichas ocorra exatamente uma vez por partida, usando `Math.subtractExact`, `Math.multiplyExact` e `Math.addExact`.
 
+
+## Arquitetura do Motor de Regras do Poker Texas Hold'em (`model`)
+
+Motor Heads-Up (1 Jogador vs. 1 Bot) com fichas virtuais (`long`), totalmente desacoplado de Swing/UI e reaproveitando `Card`, `Suit`, `Rank` e `Deck`:
+
+```mermaid
+classDiagram
+    PokerEngine <|.. TexasHoldemGame : implementa
+    TexasHoldemGame *-- Deck : baralho 52 cartas
+    TexasHoldemGame o-- PokerBotStrategy : composicao / injecao
+    PokerBotStrategy <|.. PokerSimpleAI : implementa
+    TexasHoldemGame ..> PokerHandEvaluator : avalia C(7,5)
+    PokerHandEvaluator --> EvaluatedPokerHand : produz
+    EvaluatedPokerHand --> PokerHandRank : categoria
+    TexasHoldemGame --> PokerStage : rua atual
+    TexasHoldemGame --> PokerRoundResult : desfecho
+
+    class PokerEngine {
+        <<interface>>
+        +iniciarNovaMao() boolean
+        +desistir() boolean
+        +passar() boolean
+        +pagar() boolean
+        +aumentar(long valorAcimaDaApostaAtual) boolean
+        +getEstagioAtual() PokerStage
+        +getResultadoMao() PokerRoundResult
+        +getAcoesValidasJogador() Set~PokerAction~
+        +getMaoJogador() List~Card~
+        +getCartasComunitarias() List~Card~
+        +getCartasVisiveisBot() List~Card~
+        +hasCartasOcultasBot() boolean
+        +getMelhorMaoJogadorShowdown() EvaluatedPokerHand
+        +getMelhorMaoBotShowdown() EvaluatedPokerHand
+    }
+```
+
+### Regras da Primeira Versão (`TexasHoldemGame` — Heads-Up v1)
+1. **Blinds Pares e Alternância de Botão:** `smallBlind` (`50`) e `bigBlind` (`100`) pares. No Heads-Up (1v1), o **Botão (Dealer)** paga o Small Blind, recebe a 1ª carta e **age primeiro no `PRE_FLOP`**, passando a **agir por último** no `FLOP`, `TURN` e `RIVER`. O botão alterna entre `JOGADOR` e `BOT` a cada nova mão.
+2. **Ações Válidas e Teto de Aumentos:** `DESISTIR` (*Fold*), `PASSAR` (*Check* somente quando `valorParaPagar == 0`), `PAGAR` (*Call*) e `AUMENTAR` (*Bet/Raise* par `>= bigBlind` ou *all-in* exato do saldo restante, limitado a `MAX_AUMENTOS_POR_RUA = 3` aumentos por rua).
+3. **All-In, Excesso Não Igualado e Divisão de Pote (*Split Pot*):** qualquer aposta acima do *stack* efetivo do oponente tem o excesso devolvido imediatamente; quando um lado entra em *all-in* e as apostas se igualam, as cartas comunitárias faltantes são abertas automaticamente até o `SHOWDOWN`. Em empate exato na melhor mão de 5 cartas dentre 7 (`EvaluatedPokerHand.compareTo == 0`), o pote é dividido (`pote / 2`, entregando eventual ficha ímpar ao participante fora de posição).
+4. **Ocultação Estrita e IA Honesta:** `getCartasVisiveisBot()` retorna lista vazia durante todas as ruas de apostas e também em vitórias por desistência, revelando as 2 cartas do Bot **exclusivamente no `SHOWDOWN`**. `PokerSimpleAI` decide apenas com suas 2 cartas, as comunitárias já abertas e o estado público do pote.
