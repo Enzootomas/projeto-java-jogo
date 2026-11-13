@@ -168,6 +168,23 @@ Uma mão de Truco é disputada em melhor de até 3 vazas entre o Jogador e o Bot
 
 ---
 
+## Expansão Multijogos no Salão: Terceira Mesa de Poker (Texas Hold'em)
+
+Para enriquecer ainda mais o salão do cassino e preparar a integração do motor de regras desenvolvido pelo Guilherme, foi adicionada a **Mesa de Poker (Texas Hold'em)**:
+- **Posicionamento e Circulação:** posicionada em $(340, 50)$ no setor nordeste do salão, com base sólida $80 \times 50$. A distância até as cadeiras da área de descanso $(y = 140)$ é de $40\text{ px}$ (com avatar de $24 \times 24\text{ px}$), mantendo rotas livres em linha reta e diagonais entre Blackjack $(160, 160)$, Truco $(320, 280)$, Poker $(340, 50)$, balcão do bar $(110, 40)$ e portal de entrada $(60, 320)$.
+- **Identificação Visual na Mesa:** plaqueta dourada com a inscrição "POKER" renderizada na projeção isométrica.
+- **Seleção Unificada e Determinística (Desempate Euclidiano):**
+  - O método `atualizarMesaMaisProxima()` percorre todas as mesas no raio de $35\text{ px}$ e seleciona a de menor distância física ao quadrado (`getDistanceSqToPlayer`).
+  - O aviso do salão exibe `E — Interagir com a mesa de Poker`, e a tecla `E` transita diretamente para `GameState.MENU_POKER`.
+- **Interface Gráfica (`PokerTableView`):**
+  - **Identificação Visual:** identificada como "Poker (Texas Hold'em) - Em desenvolvimento (Aguardando motor)" com feltro bordô, moldura de mogno e frisos dourados.
+  - **Board Comunitário:** 5 posições reservadas com marcações temáticas ("FLOP", "TURN", "RIVER"), exibindo apenas as cartas reveladas da fase ativa (Pré-Flop: 0; Flop: 3; Turn: 4; River/Showdown: 5).
+  - **Sigilo Estrito das Cartas do Bot:** as 2 cartas privadas do bot permanecem viradas (versos) durante todas as rodadas de apostas, sendo abertas apenas no Showdown ou após desistência (Fold).
+  - **Ações e Controles:** botões contextuais (Fold/Desistir, Passar/Pagar e Aumentar/Raise) com atalhos de teclado (`F`, `C`, `R`, `Espaço`, `1`, `2`, `3`, `N` para nova mão e `B` para retornar ao salão).
+  - **Preservação de Estado:** ao alternar telas com `B` e `E`, o estado da mão e as cartas abertas são rigorosamente preservados.
+
+---
+
 ## Fluxo Git da Dupla
 
 1. **Branch de Contrato Compartilhada:** `feat/regras-contrato` (contém o contrato oficial compilado, tipos de dados imutáveis e testes automatizados).
