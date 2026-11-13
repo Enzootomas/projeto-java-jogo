@@ -548,7 +548,7 @@ public class PokerTableView {
         if (maoFinalizada) return;
         this.maoFinalizada = true;
         this.mensagemDesfecho = "Você desistiu da mão (Fold). Vitória do Bot!";
-        this.botCartasReveladas = true;
+        this.botCartasReveladas = false;
     }
 
     /**
@@ -632,6 +632,10 @@ public class PokerTableView {
 
     public boolean isBotCartasReveladas() {
         return botCartasReveladas;
+    }
+
+    public String getMensagemDesfecho() {
+        return mensagemDesfecho;
     }
 
     public long getPoteCentral() {

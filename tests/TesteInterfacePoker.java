@@ -297,12 +297,15 @@ public class TesteInterfacePoker {
     }
 
     /**
-     * 7. Testa que as 2 hole cards do bot permanecem ocultas até o Showdown ou Fold.
+     * 7. Testa que as 2 hole cards do bot cobrem os dois caminhos:
+     *    - Fold no pré-flop mantém as cartas do bot fechadas e mão encerrada.
+     *    - Showdown com revelação autorizada mostra as cartas do bot.
      */
     public static void testarOcultamentoCartasBotAteShowdown() {
-        System.out.println("[7/10] Testando ocultamento das cartas do bot até a autorização de revelação...");
+        System.out.println("[7/10] Testando ocultamento das cartas do bot nos dois caminhos (Fold e Showdown)...");
         PokerTableView view = new PokerTableView(null);
 
+        // --- CAMINHO 1: Showdown com revelação autorizada ---
         afirme(view.getHoleCardsBot().size() == 2, "Bot deve possuir 2 hole cards.");
         afirme(!view.isBotCartasReveladas(), "Cartas do bot devem iniciar viradas (fechadas).");
 
@@ -321,9 +324,30 @@ public class TesteInterfacePoker {
         // Showdown
         view.executarCheckCall();
         afirme(view.getFaseAtual() == PokerTableView.PokerPhase.SHOWDOWN, "Deve atingir o Showdown.");
-        afirme(view.isBotCartasReveladas(), "Cartas do bot devem ser autorizadas para revelação apenas no Showdown.");
+        afirme(view.isBotCartasReveladas(), "Cartas do bot devem ser reveladas com autorização no Showdown.");
         afirme(view.isMaoFinalizada(), "Mão deve ser marcada como finalizada no Showdown.");
-        System.out.println("  -> Sucesso: Sigilo das cartas do bot respeitado estritamente.");
+
+        // --- CAMINHO 2: Fold no pré-flop mantém cartas do bot fechadas ---
+        view.iniciarNovaMaoExemplo();
+        afirme(view.getFaseAtual() == PokerTableView.PokerPhase.PRE_FLOP, "Nova mão deve iniciar no Pré-Flop.");
+        afirme(!view.isBotCartasReveladas(), "Cartas do bot devem iniciar viradas.");
+        afirme(!view.isMaoFinalizada(), "Mão não deve estar finalizada.");
+
+        // Executa Fold no pré-flop
+        view.executarFold();
+        afirme(view.isMaoFinalizada(), "Mão deve estar encerrada após Fold no pré-flop.");
+        afirme(!view.isBotCartasReveladas(),
+                "Cartas do bot DEVEM permanecer viradas/fechadas (versos) após Fold do jogador.");
+        afirme(view.getMensagemDesfecho().contains("Fold"),
+                "Banner deve confirmar desistência por Fold.");
+
+        // Valida que Nova Mão funciona normalmente após o Fold
+        view.processarTecla("N");
+        afirme(!view.isMaoFinalizada(), "Nova mão deve funcionar normalmente após Fold.");
+        afirme(view.getFaseAtual() == PokerTableView.PokerPhase.PRE_FLOP, "Fase deve ser Pré-Flop após Nova Mão.");
+        afirme(!view.isBotCartasReveladas(), "Cartas do bot continuam fechadas na nova mão.");
+
+        System.out.println("  -> Sucesso: Ambos os caminhos (Fold fechado e Showdown revelado) validados.");
     }
 
     /**
@@ -333,10 +357,10 @@ public class TesteInterfacePoker {
         System.out.println("[8/10] Testando ações de Fold, Check/Call, Raise e atalhos de teclado (F, C, R, N)...");
         PokerTableView view = new PokerTableView(null);
 
-        // 1. Testa Fold via atalho F
+        // 1. Testa Fold via atalho F (cartas do bot continuam fechadas)
         view.processarTecla("F");
         afirme(view.isMaoFinalizada(), "Mão deve estar finalizada após Fold.");
-        afirme(view.isBotCartasReveladas(), "Cartas do bot devem ser reveladas após Fold.");
+        afirme(!view.isBotCartasReveladas(), "Cartas do bot devem permanecer fechadas após Fold via atalho F.");
 
         // 2. Testa Nova Mão via atalho N
         view.processarTecla("N");
