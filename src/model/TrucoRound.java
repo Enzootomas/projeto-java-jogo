@@ -170,6 +170,40 @@ public class TrucoRound {
     }
 
     /**
+     * Retorna quantos pontos estao em disputa nesta mao de Truco Paulista.
+     * Nesta versao, o Truco utiliza pontuacao de mao (sem aposta em fichas), valendo 1 ponto.
+     */
+    public int getPontosEmDisputa() {
+        return 1;
+    }
+
+    /**
+     * Retorna quantas vazas completas o jogador humano venceu nesta mao.
+     */
+    public int getVazasVencidasJogador() {
+        int total = 0;
+        for (TrucoTrick vaza : vazas) {
+            if (vaza.isCompleta() && vaza.getResultado() == TrucoTrickResult.VITORIA_JOGADOR) {
+                total++;
+            }
+        }
+        return total;
+    }
+
+    /**
+     * Retorna quantas vazas completas o Bot venceu nesta mao.
+     */
+    public int getVazasVencidasBot() {
+        int total = 0;
+        for (TrucoTrick vaza : vazas) {
+            if (vaza.isCompleta() && vaza.getResultado() == TrucoTrickResult.VITORIA_BOT) {
+                total++;
+            }
+        }
+        return total;
+    }
+
+    /**
      * Jogador humano realiza a jogada de uma carta de sua mão.
      *
      * @param carta Carta presente na mão do jogador.
