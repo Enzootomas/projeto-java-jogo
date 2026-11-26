@@ -199,7 +199,19 @@ public class BlackjackTableView {
         g.drawString(textoAposta, centroX - (fm.stringWidth(textoAposta) / 2), centroY + 6);
 
         // Banner de resultado quando a rodada estiver FINALIZADA
-        if (engine.getEstadoRodada() == RoundState.FINALIZADA) {
+        // Possibilidades de ganho durante o turno do jogador (consultadas diretamente no motor)
+        if (engine.getEstadoRodada() == RoundState.TURNO_JOGADOR) {
+            String txtGanhos = "Possível — Vitória 1:1: lucro +"
+                    + formatadorMoeda.format(engine.getLucroPossivelVitoriaComum())
+                    + " (retorno " + formatadorMoeda.format(engine.getRetornoTotalPossivelVitoriaComum()) + ")"
+                    + "  |  BJ 3:2: lucro +"
+                    + formatadorMoeda.format(engine.getLucroPossivelBlackjackNatural())
+                    + " (retorno " + formatadorMoeda.format(engine.getRetornoTotalPossivelBlackjackNatural()) + ")";
+            g.setFont(new Font("SansSerif", Font.PLAIN, 12));
+            g.setColor(new Color(230, 240, 210));
+            FontMetrics fmG = g.getFontMetrics();
+            g.drawString(txtGanhos, centroX - (fmG.stringWidth(txtGanhos) / 2), centroY + 42);
+        } else if (engine.getEstadoRodada() == RoundState.FINALIZADA) {
             desenharBannerResultado(g, largura, centroY + 45);
         }
     }

@@ -10,6 +10,12 @@ import model.MyShape;
 
 import java.awt.BasicStroke;
 import java.awt.GradientPaint;
+import java.awt.RadialGradientPaint;
+import java.awt.Rectangle;
+import java.awt.geom.Point2D;
+import java.text.NumberFormat;
+import java.util.Locale;
+import model.RoundState;
 
 import javax.swing.AbstractAction;
 import javax.swing.ActionMap;
@@ -107,10 +113,14 @@ public class ScreenSaver extends JPanel implements ActionListener {
     private double originY;
 
     // Mensagem de interação
+    // Mensagem de interação e áreas de layout do HUD
     private boolean proximoDaMesa = false;
+    private final Rectangle hudBounds = new Rectangle();
+    private final Rectangle promptBounds = new Rectangle();
+    private final NumberFormat formatadorFichas = NumberFormat.getNumberInstance(Locale.forLanguageTag("pt-BR"));
 
     public ScreenSaver() {
-        setBackground(new Color(15, 18, 26));
+        setBackground(new Color(18, 12, 16));
         setDoubleBuffered(true);
         setFocusable(true);
 
@@ -153,14 +163,15 @@ public class ScreenSaver extends JPanel implements ActionListener {
         // Cria o balcão do bar com footprint sólido na lateral norte
         this.balcao = new CasinoCounter(110, 40, 80, 30, "BAR", 0, 0);
 
-        // Cria cadeiras de cassino com bases sólidas
-        CasinoChair c1 = new CasinoChair(140, 85, 20, 0, 0);  // Perto do balcão
-        CasinoChair c2 = new CasinoChair(310, 140, 20, 0, 0); // Área de descanso lateral
-        CasinoChair c3 = new CasinoChair(310, 180, 20, 0, 0); // Área de descanso lateral
-
-        this.cadeiras.add(c1);
-        this.cadeiras.add(c2);
-        this.cadeiras.add(c3);
+        // Cria cadeiras associadas ao bar e às três mesas, sempre voltadas para o tampo correspondente
+        this.cadeiras.add(new CasinoChair(138, 78, 18, CasinoChair.Orientation.NORTE, 0, 0));
+        this.cadeiras.add(new CasinoChair(166, 78, 18, CasinoChair.Orientation.NORTE, 0, 0));
+        this.cadeiras.add(new CasinoChair(192, 134, 18, CasinoChair.Orientation.SUL, 0, 0));
+        this.cadeiras.add(new CasinoChair(134, 176, 18, CasinoChair.Orientation.LESTE, 0, 0));
+        this.cadeiras.add(new CasinoChair(314, 66, 18, CasinoChair.Orientation.LESTE, 0, 0));
+        this.cadeiras.add(new CasinoChair(386, 108, 18, CasinoChair.Orientation.NORTE, 0, 0));
+        this.cadeiras.add(new CasinoChair(368, 254, 18, CasinoChair.Orientation.SUL, 0, 0));
+        this.cadeiras.add(new CasinoChair(352, 338, 18, CasinoChair.Orientation.NORTE, 0, 0));
 
         // Adiciona à lista de obstáculos para colisão física no solo
         this.obstaculos.add(this.mesaBlackjack);
@@ -555,10 +566,36 @@ public class ScreenSaver extends JPanel implements ActionListener {
      * Renderiza o salão isométrico, ordenando as entidades por profundidade (Z-Sorting).
      */
     private void desenharSalao(Graphics2D g2d) {
+        // Fundo em gradiente quente (mogno escuro / bordô noturno)
+        GradientPaint bgGrad = new GradientPaint(
+                0, 0, new Color(16, 11, 15),
+                0, Math.max(1, getHeight()), new Color(28, 17, 22)
+        );
+        g2d.setPaint(bgGrad);
+        g2d.fillRect(0, 0, getWidth(), getHeight());
+
         desenharPisoIsometrico(g2d);
         desenharParedesIsometricas(g2d);
         desenharPortalEntrada(g2d);
         desenharTapeteIsometrico(g2d);
+
+        // Iluminação ambiente suave sobre o centro do salão (efeito lustre quente)
+        float centroLuzX = (float) IsometricHelper.toScreenX(WORLD_SIZE * 0.5, WORLD_SIZE * 0.5, originX);
+        float centroLuzY = (float) IsometricHelper.toScreenY(WORLD_SIZE * 0.5, WORLD_SIZE * 0.5, originY);
+        float raioLuz = 320.0f;
+        RadialGradientPaint luzAmbiente = new RadialGradientPaint(
+                new Point2D.Float(centroLuzX, centroLuzY),
+                raioLuz,
+                new float[]{0.0f, 0.55f, 1.0f},
+                new Color[]{
+                        new Color(255, 215, 130, 34),
+                        new Color(210, 145, 70, 14),
+                        new Color(0, 0, 0, 0)
+                }
+        );
+        g2d.setPaint(luzAmbiente);
+        g2d.fillOval((int) (centroLuzX - raioLuz), (int) (centroLuzY - raioLuz * 0.6f),
+                (int) (raioLuz * 2), (int) (raioLuz * 1.2f));
 
         // Z-Sorting das entidades pelo ponto de apoio no solo
         entidadesRenderizaveis.sort(Comparator.comparingDouble(s -> {
@@ -583,16 +620,19 @@ public class ScreenSaver extends JPanel implements ActionListener {
 
         if (proximoDaMesa) {
             desenharBalcaoInteracao(g2d);
+        } else {
+            promptBounds.setBounds(0, 0, 0, 0);
         }
     }
 
     /**
-     * Desenha as duas paredes isométricas de fundo (Noroeste e Nordeste) com molduras.
+     * Desenha as duas paredes isométricas de fundo com lambris de mogno, papel de parede bordô,
+     * molduras douradas e arandelas de iluminação suave.
      */
     private void desenharParedesIsometricas(Graphics2D g2d) {
-        int alturaParede = 135;
+        int alturaParede = 138;
+        int alturaLambris = 46;
 
-        // Vértices do chão no fundo
         int xCentro = (int) Math.round(originX);
         int yCentro = (int) Math.round(originY);
 
@@ -602,104 +642,132 @@ public class ScreenSaver extends JPanel implements ActionListener {
         int xExtremoDir = (int) Math.round(IsometricHelper.toScreenX(WORLD_SIZE, 0, originX));
         int yExtremoDir = (int) Math.round(IsometricHelper.toScreenY(WORLD_SIZE, 0, originY));
 
-        // 1. Parede Esquerda (Nordeste de mundo, ao longo de x = 0)
+        // 1. Parede Esquerda (ao longo de x = 0)
         int[] paredeEsqX = {xCentro, xExtremoEsq, xExtremoEsq, xCentro};
         int[] paredeEsqY = {yCentro, yExtremoEsq, yExtremoEsq - alturaParede, yCentro - alturaParede};
-        g2d.setColor(new Color(22, 28, 44));
+        g2d.setColor(new Color(44, 18, 24));
         g2d.fillPolygon(paredeEsqX, paredeEsqY, 4);
 
-        // Painéis verticais decorativos na parede esquerda
-        g2d.setColor(new Color(30, 38, 60, 160));
+        // Lambris em madeira mogno na parte inferior da parede esquerda
+        int[] lambrisEsqY = {yCentro, yExtremoEsq, yExtremoEsq - alturaLambris, yCentro - alturaLambris};
+        g2d.setColor(new Color(52, 24, 16));
+        g2d.fillPolygon(paredeEsqX, lambrisEsqY, 4);
+
+        g2d.setColor(new Color(78, 34, 42, 130));
         for (int i = 64; i < WORLD_SIZE; i += 64) {
             int pxChao = (int) Math.round(IsometricHelper.toScreenX(0, i, originX));
             int pyChao = (int) Math.round(IsometricHelper.toScreenY(0, i, originY));
             g2d.drawLine(pxChao, pyChao, pxChao, pyChao - alturaParede);
         }
 
-        // Rodapé e moldura superior da parede esquerda
-        g2d.setColor(new Color(180, 140, 50));
-        g2d.setStroke(new BasicStroke(2.0f));
+        g2d.setColor(new Color(196, 156, 58));
+        g2d.setStroke(new BasicStroke(1.8f));
         g2d.drawLine(xCentro, yCentro, xExtremoEsq, yExtremoEsq);
+        g2d.drawLine(xCentro, yCentro - alturaLambris, xExtremoEsq, yExtremoEsq - alturaLambris);
         g2d.drawLine(xCentro, yCentro - alturaParede, xExtremoEsq, yExtremoEsq - alturaParede);
 
-        // 2. Parede Direita (Noroeste de mundo, ao longo de y = 0)
+        // 2. Parede Direita (ao longo de y = 0)
         int[] paredeDirX = {xCentro, xExtremoDir, xExtremoDir, xCentro};
         int[] paredeDirY = {yCentro, yExtremoDir, yExtremoDir - alturaParede, yCentro - alturaParede};
-        g2d.setColor(new Color(28, 36, 56));
+        g2d.setColor(new Color(56, 22, 30));
         g2d.fillPolygon(paredeDirX, paredeDirY, 4);
 
-        // Painéis verticais decorativos na parede direita
-        g2d.setColor(new Color(38, 48, 75, 160));
+        int[] lambrisDirY = {yCentro, yExtremoDir, yExtremoDir - alturaLambris, yCentro - alturaLambris};
+        g2d.setColor(new Color(66, 30, 20));
+        g2d.fillPolygon(paredeDirX, lambrisDirY, 4);
+
+        g2d.setColor(new Color(92, 40, 50, 130));
         for (int i = 64; i < WORLD_SIZE; i += 64) {
             int pxChao = (int) Math.round(IsometricHelper.toScreenX(i, 0, originX));
             int pyChao = (int) Math.round(IsometricHelper.toScreenY(i, 0, originY));
             g2d.drawLine(pxChao, pyChao, pxChao, pyChao - alturaParede);
         }
 
-        // Rodapé e moldura superior da parede direita
-        g2d.setColor(new Color(212, 175, 55));
+        g2d.setColor(new Color(220, 180, 68));
         g2d.drawLine(xCentro, yCentro, xExtremoDir, yExtremoDir);
+        g2d.drawLine(xCentro, yCentro - alturaLambris, xExtremoDir, yExtremoDir - alturaLambris);
         g2d.drawLine(xCentro, yCentro - alturaParede, xExtremoDir, yExtremoDir - alturaParede);
 
-        // Canto central (encontro das paredes)
-        g2d.setColor(new Color(230, 190, 80));
+        g2d.setColor(new Color(235, 198, 86));
         g2d.setStroke(new BasicStroke(2.5f));
         g2d.drawLine(xCentro, yCentro, xCentro, yCentro - alturaParede);
         g2d.setStroke(new BasicStroke(1.0f));
+
+        desenharArandelaParede(g2d, 0, 140, 88);
+        desenharArandelaParede(g2d, 150, 0, 88);
+        desenharArandelaParede(g2d, 340, 0, 88);
+    }
+
+    private void desenharArandelaParede(Graphics2D g2d, double wx, double wy, int altura) {
+        int sx = (int) Math.round(IsometricHelper.toScreenX(wx, wy, originX));
+        int sy = (int) Math.round(IsometricHelper.toScreenY(wx, wy, originY)) - altura;
+
+        g2d.setColor(new Color(255, 215, 120, 32));
+        g2d.fillOval(sx - 24, sy - 24, 48, 48);
+        g2d.setColor(new Color(255, 230, 150, 65));
+        g2d.fillOval(sx - 11, sy - 11, 22, 22);
+
+        g2d.setColor(new Color(215, 175, 62));
+        g2d.fillRect(sx - 2, sy + 2, 4, 8);
+        g2d.setColor(new Color(255, 245, 200));
+        g2d.fillOval(sx - 4, sy - 5, 8, 9);
     }
 
     /**
-     * Desenha o portal de entrada do cassino com colunas e letreiro iluminado.
+     * Desenha o portal de entrada do cassino com colunas de mogno/ouro e letreiro iluminado.
      */
     private void desenharPortalEntrada(Graphics2D g2d) {
-        // Portal localizado na parede esquerda entre wy = 270 e wy = 370
-        int alturaPortal = 100;
+        int alturaPortal = 104;
         int sx1 = (int) Math.round(IsometricHelper.toScreenX(0, 270, originX));
         int sy1 = (int) Math.round(IsometricHelper.toScreenY(0, 270, originY));
 
         int sx2 = (int) Math.round(IsometricHelper.toScreenX(0, 370, originX));
         int sy2 = (int) Math.round(IsometricHelper.toScreenY(0, 370, originY));
 
-        // Vão de entrada (fundo escuro iluminado)
         int[] vaoX = {sx1, sx2, sx2, sx1};
         int[] vaoY = {sy1, sy2, sy2 - alturaPortal, sy1 - alturaPortal};
-        g2d.setColor(new Color(10, 12, 18));
+        g2d.setColor(new Color(14, 10, 14));
         g2d.fillPolygon(vaoX, vaoY, 4);
 
-        // Brilho quente convidativo saindo da entrada
-        g2d.setColor(new Color(255, 200, 80, 45));
+        GradientPaint brilhoPortal = new GradientPaint(
+                (sx1 + sx2) / 2.0f, (sy1 + sy2) / 2.0f - alturaPortal, new Color(255, 210, 105, 85),
+                (sx1 + sx2) / 2.0f, (sy1 + sy2) / 2.0f, new Color(255, 190, 80, 22)
+        );
+        g2d.setPaint(brilhoPortal);
         g2d.fillPolygon(vaoX, vaoY, 4);
 
-        // Colunas e moldura do portal
-        g2d.setColor(new Color(212, 175, 55));
-        g2d.setStroke(new BasicStroke(3.0f));
+        g2d.setColor(new Color(224, 184, 68));
+        g2d.setStroke(new BasicStroke(3.2f));
         g2d.drawLine(sx1, sy1, sx1, sy1 - alturaPortal);
         g2d.drawLine(sx2, sy2, sx2, sy2 - alturaPortal);
         g2d.drawLine(sx1, sy1 - alturaPortal, sx2, sy2 - alturaPortal);
         g2d.setStroke(new BasicStroke(1.0f));
 
-        // Placa do letreiro sobre o portal
-        int placaW = 140;
+        int placaW = 150;
         int placaH = 26;
         int midX = (sx1 + sx2) / 2;
-        int midY = (sy1 + sy2) / 2 - alturaPortal - 15;
+        int midY = (sy1 + sy2) / 2 - alturaPortal - 16;
 
-        g2d.setColor(new Color(30, 15, 10));
+        g2d.setColor(new Color(0, 0, 0, 125));
+        g2d.fillRoundRect(midX - (placaW / 2) + 2, midY + 2, placaW, placaH, 8, 8);
+        g2d.setColor(new Color(38, 16, 18));
         g2d.fillRoundRect(midX - (placaW / 2), midY, placaW, placaH, 8, 8);
-        g2d.setColor(new Color(255, 215, 0));
+        g2d.setColor(new Color(242, 202, 82));
+        g2d.setStroke(new BasicStroke(1.4f));
         g2d.drawRoundRect(midX - (placaW / 2), midY, placaW, placaH, 8, 8);
+        g2d.setStroke(new BasicStroke(1.0f));
 
-        // Letreiro iluminado em neon dourado
         g2d.setFont(new Font("SansSerif", Font.BOLD, 11));
-        g2d.setColor(new Color(255, 235, 120));
-        g2d.drawString("★ CASSINO SOCIAL ★", midX - 62, midY + 17);
+        g2d.setColor(new Color(255, 238, 150));
+        FontMetrics fm = g2d.getFontMetrics();
+        String textoPortal = "★ CASSINO SOCIAL ★";
+        g2d.drawString(textoPortal, midX - (fm.stringWidth(textoPortal) / 2), midY + 17);
     }
 
     /**
-     * Desenha o tapete vermelho aveludado com frisos dourados no chão do salão.
+     * Desenha o tapete vermelho bordô aveludado com frisos dourados conectando a entrada ao centro do salão.
      */
     private void desenharTapeteIsometrico(Graphics2D g2d) {
-        // O tapete conecta a entrada (x=0, y=285..355) até a área central (x=210, y=200..260)
         double[][] verticesMundo = {
                 {0, 285},
                 {210, 195},
@@ -715,38 +783,41 @@ public class ScreenSaver extends JPanel implements ActionListener {
             ty[i] = (int) Math.round(IsometricHelper.toScreenY(verticesMundo[i][0], verticesMundo[i][1], originY));
         }
 
-        // Veludo vermelho bordô
-        g2d.setColor(new Color(150, 18, 24));
+        g2d.setColor(new Color(0, 0, 0, 75));
+        int[] sx = {tx[0], tx[1] + 2, tx[2] + 2, tx[3]};
+        int[] sy = {ty[0] + 2, ty[1] + 2, ty[2] + 3, ty[3] + 2};
+        g2d.fillPolygon(sx, sy, 4);
+
+        g2d.setColor(new Color(128, 18, 28));
         g2d.fillPolygon(tx, ty, 4);
 
-        // Borda dourada ornamentada
-        g2d.setColor(new Color(220, 180, 50));
+        g2d.setColor(new Color(225, 185, 68));
         g2d.setStroke(new BasicStroke(2.0f));
         g2d.drawPolygon(tx, ty, 4);
 
-        // Friso decorativo interno
-        g2d.setStroke(new BasicStroke(1.0f));
-        g2d.setColor(new Color(240, 210, 100, 140));
+        g2d.setStroke(new BasicStroke(1.1f));
+        g2d.setColor(new Color(245, 215, 115, 155));
         int[] inTx = new int[4];
         int[] inTy = new int[4];
+        double cx = (verticesMundo[0][0] + verticesMundo[1][0] + verticesMundo[2][0] + verticesMundo[3][0]) / 4.0;
+        double cy = (verticesMundo[0][1] + verticesMundo[1][1] + verticesMundo[2][1] + verticesMundo[3][1]) / 4.0;
         for (int i = 0; i < 4; i++) {
-            double cx = (verticesMundo[0][0] + verticesMundo[1][0] + verticesMundo[2][0] + verticesMundo[3][0]) / 4.0;
-            double cy = (verticesMundo[0][1] + verticesMundo[1][1] + verticesMundo[2][1] + verticesMundo[3][1]) / 4.0;
-            double interX = verticesMundo[i][0] * 0.85 + cx * 0.15;
-            double interY = verticesMundo[i][1] * 0.85 + cy * 0.15;
+            double interX = verticesMundo[i][0] * 0.87 + cx * 0.13;
+            double interY = verticesMundo[i][1] * 0.87 + cy * 0.13;
             inTx[i] = (int) Math.round(IsometricHelper.toScreenX(interX, interY, originX));
             inTy[i] = (int) Math.round(IsometricHelper.toScreenY(interX, interY, originY));
         }
         g2d.drawPolygon(inTx, inTy, 4);
+        g2d.setStroke(new BasicStroke(1.0f));
     }
 
     /**
-     * Desenha os losangos do piso do cassino (proporção isométrica 2:1 exata).
+     * Desenha os losangos do piso do cassino em paleta harmônica de madeira escura/ardósia (2:1 exata).
      */
     private void desenharPisoIsometrico(Graphics2D g2d) {
-        Color corTile1 = new Color(30, 40, 60);
-        Color corTile2 = new Color(24, 32, 48);
-        Color corLinha = new Color(45, 60, 85, 120);
+        Color corTile1 = new Color(40, 30, 36);
+        Color corTile2 = new Color(31, 23, 29);
+        Color corLinha = new Color(92, 72, 56, 105);
 
         for (int tx = 0; tx < WORLD_GRID_TILES; tx++) {
             for (int ty = 0; ty < WORLD_GRID_TILES; ty++) {
@@ -754,7 +825,6 @@ public class ScreenSaver extends JPanel implements ActionListener {
                 double wy = ty * IsometricHelper.TILE_SIZE_WORLD;
                 double wSize = IsometricHelper.TILE_SIZE_WORLD;
 
-                // 4 vértices do tile losango projetado na tela
                 int xNorte = (int) Math.round(IsometricHelper.toScreenX(wx, wy, originX));
                 int yNorte = (int) Math.round(IsometricHelper.toScreenY(wx, wy, originY));
 
@@ -779,42 +849,177 @@ public class ScreenSaver extends JPanel implements ActionListener {
         }
     }
 
+    /**
+     * Monta as linhas de resumo de apostas, pote, pontos e ganhos possíveis consultando
+     * diretamente os motores ativos ({@link BlackjackEngine}, {@link PokerEngine} e {@link TrucoRound}),
+     * sem duplicar cálculos de liquidação na interface.
+     */
+    public List<String> getLinhasResumoApostasHUD() {
+        List<String> linhas = new ArrayList<>();
+
+        if (blackjackEngine != null && blackjackEngine.getEstadoRodada() == RoundState.TURNO_JOGADOR) {
+            long aposta = blackjackEngine.getApostaAtual();
+            long lucroComum = blackjackEngine.getLucroPossivelVitoriaComum();
+            long retornoComum = blackjackEngine.getRetornoTotalPossivelVitoriaComum();
+            long lucroBJ = blackjackEngine.getLucroPossivelBlackjackNatural();
+            long retornoBJ = blackjackEngine.getRetornoTotalPossivelBlackjackNatural();
+            linhas.add("Blackjack  |  Aposta: " + formatarFichas(aposta)
+                    + "  |  Vitória 1:1: lucro +" + formatarFichas(lucroComum) + " (retorno " + formatarFichas(retornoComum) + ")"
+                    + "  |  BJ 3:2: lucro +" + formatarFichas(lucroBJ) + " (retorno " + formatarFichas(retornoBJ) + ")");
+        }
+
+        if (pokerEngine != null && pokerEngine.getEstagioAtual().isMaoEmAndamento()) {
+            long comprometido = pokerEngine.getTotalComprometidoJogadorNaMao();
+            long pote = pokerEngine.getPoteTotal();
+            long lucroPotencial = pokerEngine.getLucroLiquidoPotencialVitoriaAtual();
+            long retornoPotencial = pokerEngine.getRetornoTotalPotencialVitoriaAtual();
+            long retornoEmpate = pokerEngine.getRetornoPotencialEmpateAtual();
+            linhas.add("Poker  |  Comprometido: " + formatarFichas(comprometido)
+                    + "  |  Pote: " + formatarFichas(pote)
+                    + "  |  Vitória atual: lucro +" + formatarFichas(lucroPotencial) + " (retorno " + formatarFichas(retornoPotencial) + ")"
+                    + "  |  Empate: " + formatarFichas(retornoEmpate));
+        }
+
+        if (trucoRound != null && !trucoRound.isFinalizada()) {
+            linhas.add("Truco  |  Sem aposta em fichas  |  Em disputa: "
+                    + trucoRound.getPontosEmDisputa() + " ponto"
+                    + "  |  Vazas: Você " + trucoRound.getVazasVencidasJogador()
+                    + " × " + trucoRound.getVazasVencidasBot() + " Bot");
+        }
+
+        return linhas;
+    }
+
+    private String formatarFichas(long valor) {
+        return formatadorFichas.format(valor);
+    }
+
     private void desenharHUD(Graphics2D g2d) {
-        g2d.setColor(new Color(0, 0, 0, 180));
-        g2d.fillRect(20, 20, 520, 85);
-        g2d.setColor(new Color(255, 215, 0));
-        g2d.drawRect(20, 20, 520, 85);
+        List<String> linhasAtivas = getLinhasResumoApostasHUD();
 
-        g2d.setFont(new Font("SansSerif", Font.BOLD, 16));
-        g2d.drawString("CASSINO SOCIAL 2D - SALAO PRINCIPAL (OFFLINE)", 35, 45);
+        Font fonteTitulo = new Font("SansSerif", Font.BOLD, 15);
+        Font fonteSaldo = new Font("SansSerif", Font.BOLD, 13);
+        Font fonteLinha = new Font("SansSerif", Font.PLAIN, 12);
+        Font fonteControles = new Font("SansSerif", Font.PLAIN, 11);
 
-        g2d.setFont(new Font("SansSerif", Font.PLAIN, 13));
-        g2d.setColor(Color.WHITE);
-        g2d.drawString("Controles: WASD ou Setas (Movimento em diagonal) | ESC: Sair", 35, 68);
+        long saldoBlackjack = (blackjackEngine != null) ? blackjackEngine.getSaldoVirtual() : 0L;
+        long saldoPoker = (pokerEngine != null) ? pokerEngine.getSaldoJogador() : 0L;
 
-        g2d.setColor(new Color(100, 255, 150));
-        long saldo = (blackjackEngine != null) ? blackjackEngine.getSaldoVirtual() : 0L;
-        String saldoFormatado = String.format(java.util.Locale.GERMAN, "%,d", saldo);
-        g2d.drawString("Saldo Virtual: " + saldoFormatado + " Fichas (Sem dinheiro real)", 35, 88);
+        String textoTitulo = "CASSINO SOCIAL 2D — SALÃO PRINCIPAL (OFFLINE)";
+        String textoSaldo = "Saldo Blackjack: " + formatarFichas(saldoBlackjack) + " fichas"
+                + "   |   Stack Poker: " + formatarFichas(saldoPoker) + " fichas (sem dinheiro real)";
+        String textoVazio = "Nenhuma rodada ativa no momento — aproxime-se de uma mesa e pressione E.";
+        String textoControles = "Controles: WASD ou Setas (diagonais)  |  E: Abrir mesa  |  B: Voltar  |  ESC: Sair";
+
+        int larguraConteudo = Math.max(
+                g2d.getFontMetrics(fonteTitulo).stringWidth(textoTitulo),
+                g2d.getFontMetrics(fonteSaldo).stringWidth(textoSaldo)
+        );
+        larguraConteudo = Math.max(larguraConteudo, g2d.getFontMetrics(fonteControles).stringWidth(textoControles));
+        FontMetrics fmLinha = g2d.getFontMetrics(fonteLinha);
+        if (linhasAtivas.isEmpty()) {
+            larguraConteudo = Math.max(larguraConteudo, fmLinha.stringWidth(textoVazio));
+        } else {
+            for (String linha : linhasAtivas) {
+                larguraConteudo = Math.max(larguraConteudo, fmLinha.stringWidth(linha) + 14);
+            }
+        }
+
+        int hudX = 18;
+        int hudY = 16;
+        int hudW = Math.min(Math.max(540, larguraConteudo + 34), Math.max(540, getWidth() - 36));
+        int qtdLinhasApostas = Math.max(1, linhasAtivas.size());
+        int hudH = 88 + (qtdLinhasApostas * 19);
+
+        hudBounds.setBounds(hudX, hudY, hudW, hudH);
+
+        g2d.setColor(new Color(0, 0, 0, 110));
+        g2d.fillRoundRect(hudX + 3, hudY + 3, hudW, hudH, 12, 12);
+
+        g2d.setColor(new Color(20, 13, 17, 218));
+        g2d.fillRoundRect(hudX, hudY, hudW, hudH, 12, 12);
+
+        g2d.setColor(new Color(224, 184, 68));
+        g2d.setStroke(new BasicStroke(1.4f));
+        g2d.drawRoundRect(hudX, hudY, hudW, hudH, 12, 12);
+        g2d.setStroke(new BasicStroke(1.0f));
+
+        g2d.setFont(fonteTitulo);
+        g2d.setColor(new Color(255, 228, 132));
+        g2d.drawString(textoTitulo, hudX + 16, hudY + 24);
+
+        g2d.setFont(fonteSaldo);
+        g2d.setColor(new Color(112, 240, 165));
+        g2d.drawString(textoSaldo, hudX + 16, hudY + 45);
+
+        g2d.setColor(new Color(215, 175, 65, 85));
+        g2d.drawLine(hudX + 14, hudY + 53, hudX + hudW - 14, hudY + 53);
+
+        g2d.setFont(fonteLinha);
+        int yLinha = hudY + 70;
+        if (linhasAtivas.isEmpty()) {
+            g2d.setColor(new Color(198, 190, 196));
+            g2d.drawString(textoVazio, hudX + 16, yLinha);
+            yLinha += 19;
+        } else {
+            for (String linha : linhasAtivas) {
+                Color corTag;
+                if (linha.startsWith("Blackjack")) {
+                    corTag = new Color(90, 220, 145);
+                } else if (linha.startsWith("Poker")) {
+                    corTag = new Color(255, 198, 112);
+                } else {
+                    corTag = new Color(130, 198, 255);
+                }
+                g2d.setColor(corTag);
+                g2d.fillOval(hudX + 16, yLinha - 8, 6, 6);
+                g2d.setColor(new Color(244, 240, 236));
+                g2d.drawString(linha, hudX + 27, yLinha);
+                yLinha += 19;
+            }
+        }
+
+        g2d.setFont(fonteControles);
+        g2d.setColor(new Color(185, 178, 184));
+        g2d.drawString(textoControles, hudX + 16, hudY + hudH - 10);
     }
 
     private void desenharBalcaoInteracao(Graphics2D g2d) {
         if (mesaAtiva == null) {
+            promptBounds.setBounds(0, 0, 0, 0);
             return;
         }
         int cx = getWidth() / 2;
-        int cy = getHeight() - 100;
+        int cy = getHeight() - 78;
+        int w = 390;
+        int h = 46;
+        int x = cx - (w / 2);
+        int y = cy - (h / 2);
 
-        g2d.setColor(new Color(0, 0, 0, 210));
-        g2d.fillRoundRect(cx - 190, cy - 25, 380, 50, 15, 15);
-        g2d.setColor(new Color(255, 215, 0));
-        g2d.drawRoundRect(cx - 190, cy - 25, 380, 50, 15, 15);
+        promptBounds.setBounds(x, y, w, h);
+
+        g2d.setColor(new Color(0, 0, 0, 110));
+        g2d.fillRoundRect(x + 2, y + 3, w, h, 14, 14);
+        g2d.setColor(new Color(24, 14, 18, 232));
+        g2d.fillRoundRect(x, y, w, h, 14, 14);
+        g2d.setColor(new Color(240, 200, 76));
+        g2d.setStroke(new BasicStroke(1.6f));
+        g2d.drawRoundRect(x, y, w, h, 14, 14);
+        g2d.setStroke(new BasicStroke(1.0f));
 
         g2d.setFont(new Font("SansSerif", Font.BOLD, 15));
-        g2d.setColor(Color.YELLOW);
+        g2d.setColor(new Color(255, 236, 130));
         String texto = "E — Interagir com a mesa de " + mesaAtiva.getGameName();
         FontMetrics fm = g2d.getFontMetrics();
-        g2d.drawString(texto, cx - (fm.stringWidth(texto) / 2), cy + 6);
+        g2d.drawString(texto, cx - (fm.stringWidth(texto) / 2), cy + 5);
+    }
+
+    public Rectangle getHudBounds() {
+        return new Rectangle(hudBounds);
+    }
+
+    public Rectangle getPromptBounds() {
+        return new Rectangle(promptBounds);
     }
 
     /**
