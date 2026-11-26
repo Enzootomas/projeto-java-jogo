@@ -6,9 +6,12 @@ import model.PokerAction;
 import model.PokerEngine;
 import model.PokerParticipant;
 import model.PokerRoundResult;
+import model.PokerSeatState;
+import model.PokerSidePot;
 import model.PokerStage;
 import model.Suit;
 import model.TexasHoldemGame;
+import model.TexasHoldemTableGame;
 
 import java.awt.BasicStroke;
 import java.awt.Color;
@@ -36,9 +39,13 @@ import java.util.Set;
  */
 public class PokerTableView {
 
+    /** Pausa visível entre turnos dos Bots na mesa de 6 lugares (segundos). */
+    public static final double PAUSA_BOT_POKER_SEGUNDOS = 0.85;
+
     private final ScreenSaver screenSaver;
     private final PokerEngine engine;
     private final NumberFormat formatadorMoeda = NumberFormat.getNumberInstance(Locale.forLanguageTag("pt-BR"));
+    private double cronometroBotSegundos = 0.0;
 
     // Áreas de interação para cliques do mouse
     private final Rectangle btnFold = new Rectangle();
@@ -80,9 +87,41 @@ public class PokerTableView {
     }
 
     private static PokerEngine criarMotorPadraoIniciado() {
-        TexasHoldemGame motor = new TexasHoldemGame();
+        TexasHoldemTableGame motor = new TexasHoldemTableGame();
         motor.iniciarNovaMao();
         return motor;
+    }
+
+    /**
+     * Atualiza a pausa entre turnos dos Bots sem bloquear a EDT do Swing.
+     * Chamado pelo {@link ScreenSaver} apenas enquanto {@code MENU_POKER} está ativo,
+     * pausando automaticamente ao sair com {@code B} e retomando ao voltar com {@code E}.
+     */
+    public void atualizarTemporizacao(double dt) {
+        if (dt <= 0.0 || !(engine instanceof TexasHoldemTableGame)) {
+            return;
+        }
+        TexasHoldemTableGame mesa = (TexasHoldemTableGame) engine;
+        if (!mesa.isAguardandoAcaoBot()) {
+            cronometroBotSegundos = 0.0;
+            return;
+        }
+        if (cronometroBotSegundos <= 0.0) {
+            cronometroBotSegundos = PAUSA_BOT_POKER_SEGUNDOS;
+        }
+        cronometroBotSegundos -= dt;
+        if (cronometroBotSegundos <= 0.0) {
+            cronometroBotSegundos = 0.0;
+            mesa.executarPassoBot();
+            if (mesa.isAguardandoAcaoBot()) {
+                cronometroBotSegundos = PAUSA_BOT_POKER_SEGUNDOS;
+            }
+            solicitarRepintura();
+        }
+    }
+
+    public double getCronometroBotSegundos() {
+        return cronometroBotSegundos;
     }
 
     /**
@@ -102,8 +141,12 @@ public class PokerTableView {
         // 3. Cabeçalho, fase atual, blinds e turno
         desenharCabecalho(g, largura);
 
-        // 4. Área do Bot (Topo) — consulta estritamente getCartasVisiveisBot() / hasCartasOcultasBot()
-        desenharAreaBot(g, largura);
+        // 4. Área dos Bots (6 lugares quando TexasHoldemTableGame, ou 1v1 quando TexasHoldemGame)
+        if (engine instanceof TexasHoldemTableGame) {
+            desenharAssentosSeisJogadores(g, (TexasHoldemTableGame) engine, largura, altura);
+        } else {
+            desenharAreaBot(g, largura);
+        }
 
         // 5. Área Central: Pote, última ação e 5 espaços do Board comunitário
         desenharAreaBoardEPot(g, largura, altura);
@@ -160,7 +203,9 @@ public class PokerTableView {
         g.setFont(new Font("SansSerif", Font.BOLD, 17));
         g.setColor(new Color(255, 225, 130));
         FontMetrics fm = g.getFontMetrics();
-        String titulo = "TEXAS HOLD'EM POKER (1 vs 1)";
+        String titulo = (engine instanceof TexasHoldemTableGame)
+                ? "TEXAS HOLD'EM POKER — MESA DE " + ((TexasHoldemTableGame) engine).getSeats().size() + " LUGARES"
+                : "TEXAS HOLD'EM POKER (1 vs 1)";
         g.drawString(titulo, cx - (fm.stringWidth(titulo) / 2), 64);
 
         PokerStage estagio = engine.getEstagioAtual();
@@ -170,6 +215,13 @@ public class PokerTableView {
             txtTurno = "Sua vez";
         } else if (turno == PokerParticipant.BOT) {
             txtTurno = "Turno do Bot";
+            if (engine instanceof TexasHoldemTableGame) {
+                TexasHoldemTableGame mesa = (TexasHoldemTableGame) engine;
+                int seatIdx = mesa.getSeatTurnoAtual();
+                if (seatIdx >= 0 && seatIdx < mesa.getSeats().size()) {
+                    txtTurno = "Turno de " + mesa.getSeats().get(seatIdx).getNome();
+                }
+            }
         } else {
             txtTurno = "Mão encerrada";
         }
@@ -230,6 +282,152 @@ public class PokerTableView {
         }
     }
 
+    private void desenharAssentosSeisJogadores(Graphics2D g, TexasHoldemTableGame mesa, int largura, int altura) {
+        List<PokerSeatState> seats = mesa.getSeats();
+        if (seats.size() <= 1) {
+            return;
+        }
+        PokerStage estagio = mesa.getEstagioAtual();
+        int cx = largura / 2;
+        int cy = (altura / 2) - 10;
+        int margemX = 72;
+
+        int numBots = seats.size() - 1;
+        int[][] posicoes = new int[numBots][2];
+        if (numBots == 5) {
+            posicoes[0] = new int[]{margemX + 86, cy + 48};            // Bot 1 (esquerda inferior)
+            posicoes[1] = new int[]{margemX + 108, 152};               // Bot 2 (esquerda superior)
+            posicoes[2] = new int[]{cx, 134};                          // Bot 3 (topo centro)
+            posicoes[3] = new int[]{largura - margemX - 108, 152};     // Bot 4 (direita superior)
+            posicoes[4] = new int[]{largura - margemX - 86, cy + 48};  // Bot 5 (direita inferior)
+        } else {
+            for (int i = 0; i < numBots; i++) {
+                double fracao = (numBots == 1) ? 0.5 : (double) i / (numBots - 1);
+                double angulo = Math.PI * (0.12 + 0.76 * fracao);
+                int rx = (largura / 2) - 150;
+                int ry = Math.max(95, cy - 120);
+                posicoes[i][0] = cx - (int) Math.round(Math.cos(angulo) * rx);
+                posicoes[i][1] = cy - (int) Math.round(Math.sin(angulo) * ry) + 28;
+            }
+        }
+
+        int boxW = 166;
+        int boxH = 74;
+        for (int i = 1; i < seats.size(); i++) {
+            PokerSeatState seat = seats.get(i);
+            int bx = posicoes[i - 1][0] - (boxW / 2);
+            int by = posicoes[i - 1][1] - (boxH / 2);
+            boolean turnoAtivo = estagio.isMaoEmAndamento() && mesa.getSeatTurnoAtual() == seat.getSeatIndex();
+            boolean inativo = seat.isDesistiu() || seat.isEliminado();
+
+            // Fundo do cartão do assento
+            if (inativo) {
+                g.setColor(new Color(20, 22, 28, 175));
+            } else if (turnoAtivo) {
+                g.setColor(new Color(48, 36, 16, 225));
+            } else {
+                g.setColor(new Color(18, 22, 32, 210));
+            }
+            g.fillRoundRect(bx, by, boxW, boxH, 12, 12);
+
+            // Borda com destaque dourado quando é o turno do Bot
+            if (turnoAtivo) {
+                g.setColor(new Color(255, 215, 0));
+                g.setStroke(new BasicStroke(2.2f));
+            } else if (seat.isAllIn()) {
+                g.setColor(new Color(235, 130, 50));
+                g.setStroke(new BasicStroke(1.6f));
+            } else {
+                g.setColor(inativo ? new Color(90, 90, 95) : new Color(165, 135, 65));
+                g.setStroke(new BasicStroke(1.2f));
+            }
+            g.drawRoundRect(bx, by, boxW, boxH, 12, 12);
+            g.setStroke(new BasicStroke(1.0f));
+
+            // Nome + marcadores [D] [SB] [BB]
+            StringBuilder rotulo = new StringBuilder(seat.getNome());
+            if (mesa.getSeatDealer() == seat.getSeatIndex()) {
+                rotulo.append(" [D]");
+            }
+            if (mesa.getSeatSmallBlind() == seat.getSeatIndex()) {
+                rotulo.append(" [SB]");
+            }
+            if (mesa.getSeatBigBlind() == seat.getSeatIndex()) {
+                rotulo.append(" [BB]");
+            }
+
+            g.setFont(new Font("SansSerif", Font.BOLD, 11));
+            g.setColor(inativo ? new Color(150, 150, 155) : new Color(255, 232, 160));
+            g.drawString(rotulo.toString(), bx + 8, by + 16);
+
+            // Stack e aposta na rua
+            g.setFont(new Font("SansSerif", Font.PLAIN, 10));
+            g.setColor(inativo ? new Color(135, 135, 140) : new Color(220, 235, 225));
+            String infoStack = "Stack: " + formatarMoeda(seat.getSaldo()) + " | Ap: " + formatarMoeda(seat.getApostaNaRua());
+            g.drawString(infoStack, bx + 8, by + 31);
+
+            // Status / última ação / mão no Showdown
+            EvaluatedPokerHand maoShow = seat.getMaoShowdown(estagio);
+            String status;
+            Color corStatus;
+            if (maoShow != null) {
+                status = maoShow.getDescricaoCurta();
+                corStatus = new Color(255, 215, 110);
+            } else if (seat.isEliminado()) {
+                status = "Eliminado";
+                corStatus = new Color(160, 110, 110);
+            } else if (seat.isDesistiu()) {
+                status = "Desistiu";
+                corStatus = new Color(190, 120, 120);
+            } else if (seat.isAllIn()) {
+                status = "ALL-IN";
+                corStatus = new Color(255, 165, 80);
+            } else if (turnoAtivo) {
+                status = "Pensando...";
+                corStatus = new Color(255, 225, 120);
+            } else if (seat.getUltimaAcao() != null && !seat.getUltimaAcao().isBlank()) {
+                status = seat.getUltimaAcao();
+                corStatus = new Color(190, 220, 240);
+            } else {
+                status = "Na mão";
+                corStatus = new Color(170, 200, 180);
+            }
+            g.setFont(new Font("SansSerif", Font.BOLD, 10));
+            g.setColor(corStatus);
+            g.drawString(status, bx + 8, by + 46);
+
+            // Mini cartas do Bot (reveladas SOMENTE se motor autorizar no Showdown)
+            int miniW = 24;
+            int miniH = 32;
+            int cardX = bx + boxW - (miniW * 2) - 12;
+            int cardY = by + boxH - miniH - 4;
+            List<Card> visiveis = seat.getCartasVisiveis(estagio);
+            boolean ocultas = seat.hasCartasOcultas(estagio);
+            if (!ocultas && !visiveis.isEmpty()) {
+                for (int c = 0; c < Math.min(2, visiveis.size()); c++) {
+                    desenharMiniCartaAberta(g, visiveis.get(c), cardX + c * (miniW + 4), cardY, miniW, miniH);
+                }
+            } else if (seat.getQuantidadeCartas() > 0 && !seat.isDesistiu() && !seat.isEliminado()) {
+                desenharCartaFechada(g, cardX, cardY, miniW, miniH);
+                desenharCartaFechada(g, cardX + miniW + 4, cardY, miniW, miniH);
+            }
+        }
+    }
+
+    private void desenharMiniCartaAberta(Graphics2D g, Card carta, int x, int y, int w, int h) {
+        g.setColor(Color.WHITE);
+        g.fillRoundRect(x, y, w, h, 5, 5);
+        g.setColor(new Color(170, 170, 170));
+        g.drawRoundRect(x, y, w, h, 5, 5);
+
+        boolean vermelho = (carta.getSuit() == Suit.COPAS || carta.getSuit() == Suit.OUROS);
+        g.setColor(vermelho ? new Color(190, 20, 20) : new Color(20, 20, 20));
+        g.setFont(new Font("SansSerif", Font.BOLD, 9));
+        g.drawString(carta.getRank().getSimbolo(), x + 3, y + 11);
+        g.setFont(new Font("SansSerif", Font.PLAIN, 11));
+        g.drawString(carta.getSuit().getSimbolo(), x + 6, y + 25);
+    }
+
     private void desenharAreaBoardEPot(Graphics2D g, int largura, int altura) {
         int cx = largura / 2;
         int cy = (altura / 2) - 10;
@@ -279,6 +477,26 @@ public class PokerTableView {
             FontMetrics fmAcao = g.getFontMetrics();
             g.drawString(ultimaAcao, cx - (fmAcao.stringWidth(ultimaAcao) / 2), boardY + cardH + 22);
         }
+
+        // Exibição de Pote Principal e Side Pots quando houver potes paralelos na mesa de 6 lugares
+        if (engine instanceof TexasHoldemTableGame) {
+            List<PokerSidePot> potes = ((TexasHoldemTableGame) engine).getPotes();
+            if (potes.size() > 1) {
+                StringBuilder sbPotes = new StringBuilder();
+                for (int i = 0; i < potes.size(); i++) {
+                    if (i > 0) {
+                        sbPotes.append("  |  ");
+                    }
+                    PokerSidePot p = potes.get(i);
+                    sbPotes.append(p.getRotulo()).append(": ").append(formatarMoeda(p.getValor()));
+                }
+                g.setFont(new Font("SansSerif", Font.BOLD, 11));
+                g.setColor(new Color(255, 215, 110));
+                FontMetrics fmPotes = g.getFontMetrics();
+                String txtPotes = sbPotes.toString();
+                g.drawString(txtPotes, cx - (fmPotes.stringWidth(txtPotes) / 2), boardY + cardH + 38);
+            }
+        }
     }
 
     private void desenharSlotVazio(Graphics2D g, int x, int y, int w, int h, String rotulo) {
@@ -326,8 +544,16 @@ public class PokerTableView {
         FontMetrics fm = g.getFontMetrics();
         g.drawString(textoMao, cx - (fm.stringWidth(textoMao) / 2), yJogador + cardH + 18);
 
-        String marcadorDealer = (engine.getBotaoDealer() == PokerParticipant.JOGADOR) ? " [D]" : "";
-        String infoJogador = "Você" + marcadorDealer
+        StringBuilder marcadorJogador = new StringBuilder();
+        if (engine instanceof TexasHoldemTableGame) {
+            TexasHoldemTableGame mesa = (TexasHoldemTableGame) engine;
+            if (mesa.getSeatDealer() == 0) marcadorJogador.append(" [D]");
+            if (mesa.getSeatSmallBlind() == 0) marcadorJogador.append(" [SB]");
+            if (mesa.getSeatBigBlind() == 0) marcadorJogador.append(" [BB]");
+        } else if (engine.getBotaoDealer() == PokerParticipant.JOGADOR) {
+            marcadorJogador.append(" [D]");
+        }
+        String infoJogador = "Você" + marcadorJogador
                 + " — Stack: " + formatarMoeda(engine.getSaldoJogador()) + " Fichas"
                 + "  |  Sua Aposta: " + formatarMoeda(engine.getApostaJogadorNaRua());
 

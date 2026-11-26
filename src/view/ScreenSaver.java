@@ -28,6 +28,7 @@ import model.BlackjackEngine;
 import model.BlackjackGame;
 import model.PokerEngine;
 import model.TexasHoldemGame;
+import model.TexasHoldemTableGame;
 import model.TrucoDeck;
 import model.TrucoPlayer;
 import model.TrucoRound;
@@ -218,7 +219,7 @@ public class ScreenSaver extends JPanel implements ActionListener {
      * Inicializa a interface da mesa de Poker Texas Hold'em.
      */
     private void configurarMesaPoker() {
-        this.pokerEngine = new TexasHoldemGame();
+        this.pokerEngine = new TexasHoldemTableGame();
         this.pokerEngine.iniciarNovaMao();
         this.pokerTableView = new PokerTableView(this, this.pokerEngine);
     }
@@ -563,6 +564,8 @@ public class ScreenSaver extends JPanel implements ActionListener {
         }
         if (estadoAtual == GameState.MENU_TRUCO && !usandoTrucoRoundLegado && trucoMatchView != null) {
             trucoMatchView.atualizarTemporizacao(dt);
+        } else if (estadoAtual == GameState.MENU_POKER && pokerTableView != null) {
+            pokerTableView.atualizarTemporizacao(dt);
         }
         if (false) {
         }
@@ -1248,6 +1251,12 @@ public class ScreenSaver extends JPanel implements ActionListener {
 
     public boolean isMovendoParaDireita() {
         return teclasPressionadas.contains("D") || teclasPressionadas.contains("RIGHT");
+    }
+
+    public void avancarTempoPoker(double segundos) {
+        if (estadoAtual == GameState.MENU_POKER && pokerTableView != null && segundos > 0.0) {
+            pokerTableView.atualizarTemporizacao(segundos);
+        }
     }
 
     public CasinoCounter getBalcao() {
