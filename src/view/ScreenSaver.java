@@ -57,7 +57,8 @@ public class ScreenSaver extends JPanel implements ActionListener {
     public enum GameState {
         SALAO,
         MENU_BLACKJACK,
-        MENU_TRUCO
+        MENU_TRUCO,
+        MENU_POKER
     }
 
     private GameState estadoAtual = GameState.SALAO;
@@ -70,6 +71,7 @@ public class ScreenSaver extends JPanel implements ActionListener {
     private MyCharacter player;
     private CasinoTable mesaBlackjack;
     private CasinoTable mesaTruco;
+    private CasinoTable mesaPoker;
     private CasinoTable mesaAtiva;
     private CasinoCounter balcao;
     private List<CasinoChair> cadeiras;
@@ -84,6 +86,9 @@ public class ScreenSaver extends JPanel implements ActionListener {
     private TrucoRound trucoRound;
     private TrucoTableView trucoTableView;
     private TrucoPlayer proximoPrimeiroDaMao = TrucoPlayer.JOGADOR;
+
+    // Interface da Mesa de Poker (Texas Hold'em)
+    private PokerTableView pokerTableView;
 
     // Loop e Tempo
     private Timer timer;
@@ -108,6 +113,7 @@ public class ScreenSaver extends JPanel implements ActionListener {
         inicializarEntidades();
         configurarMesaBlackjack();
         configurarMesaTruco();
+        configurarMesaPoker();
         configurarKeyBindings();
         configurarTratamentoFoco();
         configurarMouseListener();
@@ -137,6 +143,9 @@ public class ScreenSaver extends JPanel implements ActionListener {
         // Cria a mesa de Truco em área ampla com circulação livre
         this.mesaTruco = new CasinoTable(320, 280, 80, 50, spriteMesa, "Truco", 0, 0);
 
+        // Cria a terceira mesa (Poker Texas Hold'em) no setor nordeste com circulação desimpedida
+        this.mesaPoker = new CasinoTable(340, 50, 80, 50, spriteMesa, "Poker", 0, 0);
+
         // Cria o balcão do bar com footprint sólido na lateral norte
         this.balcao = new CasinoCounter(110, 40, 80, 30, "BAR", 0, 0);
 
@@ -152,6 +161,7 @@ public class ScreenSaver extends JPanel implements ActionListener {
         // Adiciona à lista de obstáculos para colisão física no solo
         this.obstaculos.add(this.mesaBlackjack);
         this.obstaculos.add(this.mesaTruco);
+        this.obstaculos.add(this.mesaPoker);
         this.obstaculos.add(this.balcao);
         for (CasinoChair c : this.cadeiras) {
             this.obstaculos.add(c);
@@ -160,6 +170,7 @@ public class ScreenSaver extends JPanel implements ActionListener {
         // Adiciona à lista heterogênea polimórfica de renderização com Z-sorting
         this.entidadesRenderizaveis.add(this.mesaBlackjack);
         this.entidadesRenderizaveis.add(this.mesaTruco);
+        this.entidadesRenderizaveis.add(this.mesaPoker);
         this.entidadesRenderizaveis.add(this.balcao);
         for (CasinoChair c : this.cadeiras) {
             this.entidadesRenderizaveis.add(c);
@@ -184,6 +195,13 @@ public class ScreenSaver extends JPanel implements ActionListener {
         this.trucoTableView = new TrucoTableView(this);
     }
 
+    /**
+     * Inicializa a interface da mesa de Poker Texas Hold'em.
+     */
+    private void configurarMesaPoker() {
+        this.pokerTableView = new PokerTableView(this);
+    }
+
     private void configurarMouseListener() {
         addMouseListener(new MouseAdapter() {
             @Override
@@ -204,6 +222,11 @@ public class ScreenSaver extends JPanel implements ActionListener {
             }
         } else if (estadoAtual == GameState.MENU_TRUCO && trucoTableView != null) {
             boolean sairParaSalao = trucoTableView.processarClique(x, y);
+            if (sairParaSalao) {
+                processarRetornoB();
+            }
+        } else if (estadoAtual == GameState.MENU_POKER && pokerTableView != null) {
+            boolean sairParaSalao = pokerTableView.processarClique(x, y);
             if (sairParaSalao) {
                 processarRetornoB();
             }
@@ -257,29 +280,38 @@ public class ScreenSaver extends JPanel implements ActionListener {
             }
         });
 
-        // Tecla ESPACO: Apostar e Jogar na mesa
+        // Tecla ESPACO: Apostar/Jogar no Blackjack ou Check/Call no Poker
         im.put(KeyStroke.getKeyStroke("pressed SPACE"), "press_SPACE");
         am.put("press_SPACE", new AbstractAction() {
             @Override
             public void actionPerformed(ActionEvent e) {
                 if (estadoAtual == GameState.MENU_BLACKJACK && blackjackTableView != null) {
                     blackjackTableView.processarTecla("ESPACO");
+                } else if (estadoAtual == GameState.MENU_POKER && pokerTableView != null) {
+                    pokerTableView.processarTecla("ESPACO");
                 }
             }
         });
 
-        // Teclas numericas para selecao de fichas (Blackjack) ou cartas (Truco)
+        // Teclas numericas para selecao de fichas (Blackjack/Poker) ou cartas (Truco)
         configurarTeclaAtalhoMesa(im, am, "1", "FICHA_1");
         configurarTeclaAtalhoMesa(im, am, "2", "FICHA_2");
         configurarTeclaAtalhoMesa(im, am, "3", "FICHA_3");
 
-        // Tecla N para Nova Mão no Truco quando finalizada
+        // Teclas de acao do Poker Texas Hold'em
+        configurarTeclaAtalhoMesa(im, am, "F", "FOLD");
+        configurarTeclaAtalhoMesa(im, am, "C", "CHECK");
+        configurarTeclaAtalhoMesa(im, am, "R", "RAISE");
+
+        // Tecla N para Nova Mão no Truco ou Poker quando finalizada
         im.put(KeyStroke.getKeyStroke("pressed N"), "press_N");
         am.put("press_N", new AbstractAction() {
             @Override
             public void actionPerformed(ActionEvent e) {
                 if (estadoAtual == GameState.MENU_TRUCO && trucoTableView != null) {
                     trucoTableView.processarTecla("NOVA_MAO");
+                } else if (estadoAtual == GameState.MENU_POKER && pokerTableView != null) {
+                    pokerTableView.processarTecla("NOVA_MAO");
                 }
             }
         });
@@ -321,6 +353,8 @@ public class ScreenSaver extends JPanel implements ActionListener {
                     blackjackTableView.processarTecla(comando);
                 } else if (estadoAtual == GameState.MENU_TRUCO && trucoTableView != null) {
                     trucoTableView.processarTecla(comando);
+                } else if (estadoAtual == GameState.MENU_POKER && pokerTableView != null) {
+                    pokerTableView.processarTecla(comando);
                 }
             }
         });
@@ -359,7 +393,7 @@ public class ScreenSaver extends JPanel implements ActionListener {
     }
 
     public void processarRetornoB() {
-        if (estadoAtual == GameState.MENU_BLACKJACK || estadoAtual == GameState.MENU_TRUCO) {
+        if (estadoAtual == GameState.MENU_BLACKJACK || estadoAtual == GameState.MENU_TRUCO || estadoAtual == GameState.MENU_POKER) {
             player.playSound();
             estadoAtual = GameState.SALAO;
             teclasPressionadas.clear();
@@ -372,12 +406,14 @@ public class ScreenSaver extends JPanel implements ActionListener {
                 player.playSound();
                 if ("Truco".equalsIgnoreCase(mesaAtiva.getGameName())) {
                     estadoAtual = GameState.MENU_TRUCO;
+                } else if ("Poker".equalsIgnoreCase(mesaAtiva.getGameName())) {
+                    estadoAtual = GameState.MENU_POKER;
                 } else {
                     estadoAtual = GameState.MENU_BLACKJACK;
                 }
                 teclasPressionadas.clear();
             }
-        } else if (estadoAtual == GameState.MENU_BLACKJACK || estadoAtual == GameState.MENU_TRUCO) {
+        } else if (estadoAtual == GameState.MENU_BLACKJACK || estadoAtual == GameState.MENU_TRUCO || estadoAtual == GameState.MENU_POKER) {
             player.playSound();
             estadoAtual = GameState.SALAO;
             teclasPressionadas.clear();
@@ -386,23 +422,25 @@ public class ScreenSaver extends JPanel implements ActionListener {
 
     /**
      * Determina de forma unificada qual mesa está ao alcance do jogador.
-     * Se ambas estiverem ao alcance, seleciona a que tiver menor distância física.
+     * Se múltiplas mesas estiverem ao alcance, seleciona deterministamente a que tiver
+     * menor distância física euclidiana ao quadrado (getDistanceSqToPlayer).
      */
     public void atualizarMesaMaisProxima() {
-        boolean pertoBlackjack = mesaBlackjack != null && mesaBlackjack.isPlayerNear(player, 35);
-        boolean pertoTruco = mesaTruco != null && mesaTruco.isPlayerNear(player, 35);
+        CasinoTable maisProxima = null;
+        double menorDistSq = Double.MAX_VALUE;
 
-        if (pertoBlackjack && pertoTruco) {
-            double distB = mesaBlackjack.getDistanceSqToPlayer(player);
-            double distT = mesaTruco.getDistanceSqToPlayer(player);
-            this.mesaAtiva = (distB <= distT) ? mesaBlackjack : mesaTruco;
-        } else if (pertoBlackjack) {
-            this.mesaAtiva = mesaBlackjack;
-        } else if (pertoTruco) {
-            this.mesaAtiva = mesaTruco;
-        } else {
-            this.mesaAtiva = null;
+        CasinoTable[] mesas = {mesaBlackjack, mesaTruco, mesaPoker};
+        for (CasinoTable mesa : mesas) {
+            if (mesa != null && mesa.isPlayerNear(player, 35)) {
+                double distSq = mesa.getDistanceSqToPlayer(player);
+                if (distSq < menorDistSq) {
+                    menorDistSq = distSq;
+                    maisProxima = mesa;
+                }
+            }
         }
+
+        this.mesaAtiva = maisProxima;
         this.proximoDaMesa = (this.mesaAtiva != null);
     }
 
@@ -453,6 +491,9 @@ public class ScreenSaver extends JPanel implements ActionListener {
         if (mesaTruco != null) {
             mesaTruco.updateOrigins(originX, originY);
         }
+        if (mesaPoker != null) {
+            mesaPoker.updateOrigins(originX, originY);
+        }
         if (balcao != null) {
             balcao.updateOrigins(originX, originY);
         }
@@ -497,6 +538,8 @@ public class ScreenSaver extends JPanel implements ActionListener {
             desenharMenuBlackjack(g2d);
         } else if (estadoAtual == GameState.MENU_TRUCO) {
             desenharMenuTruco(g2d);
+        } else if (estadoAtual == GameState.MENU_POKER) {
+            desenharMenuPoker(g2d);
         }
 
         g2d.dispose();
@@ -787,6 +830,15 @@ public class ScreenSaver extends JPanel implements ActionListener {
     }
 
     /**
+     * Renderiza a interface da mesa de Poker Texas Hold'em através de PokerTableView.
+     */
+    private void desenharMenuPoker(Graphics2D g2d) {
+        if (pokerTableView != null) {
+            pokerTableView.render(g2d, getWidth(), getHeight());
+        }
+    }
+
+    /**
      * Inicia uma nova mão de Truco 1 vs 1 alternando o primeiro a jogar.
      */
     public void iniciarNovaMaoTruco() {
@@ -814,6 +866,22 @@ public class ScreenSaver extends JPanel implements ActionListener {
     public void processarComandoTruco(String comando) {
         if (estadoAtual == GameState.MENU_TRUCO && trucoTableView != null) {
             trucoTableView.processarTecla(comando);
+        }
+    }
+
+    public PokerTableView getPokerTableView() {
+        return pokerTableView;
+    }
+
+    public void setPokerTableView(PokerTableView pokerTableView) {
+        if (pokerTableView != null) {
+            this.pokerTableView = pokerTableView;
+        }
+    }
+
+    public void processarComandoPoker(String comando) {
+        if (estadoAtual == GameState.MENU_POKER && pokerTableView != null) {
+            pokerTableView.processarTecla(comando);
         }
     }
 
@@ -846,6 +914,10 @@ public class ScreenSaver extends JPanel implements ActionListener {
 
     public CasinoTable getMesaTruco() {
         return mesaTruco;
+    }
+
+    public CasinoTable getMesaPoker() {
+        return mesaPoker;
     }
 
     public CasinoTable getMesaAtiva() {
