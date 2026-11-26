@@ -93,6 +93,8 @@ public class ScreenSaver extends JPanel implements ActionListener {
     // Interface e Motor do Truco Paulista
     private TrucoRound trucoRound;
     private TrucoTableView trucoTableView;
+    private TrucoMatchView trucoMatchView;
+    private boolean usandoTrucoRoundLegado = false;
     private TrucoPlayer proximoPrimeiroDaMao = TrucoPlayer.JOGADOR;
 
     // Interface da Mesa de Poker (Texas Hold'em)
@@ -208,6 +210,8 @@ public class ScreenSaver extends JPanel implements ActionListener {
     private void configurarMesaTruco() {
         this.trucoRound = TrucoRound.iniciarComBaralho(new TrucoDeck(), TrucoPlayer.JOGADOR);
         this.trucoTableView = new TrucoTableView(this);
+        this.trucoMatchView = new TrucoMatchView(this);
+        this.usandoTrucoRoundLegado = false;
     }
 
     /**
@@ -238,7 +242,9 @@ public class ScreenSaver extends JPanel implements ActionListener {
                 processarRetornoB();
             }
         } else if (estadoAtual == GameState.MENU_TRUCO && trucoTableView != null) {
-            boolean sairParaSalao = trucoTableView.processarClique(x, y);
+            boolean sairParaSalao = (!usandoTrucoRoundLegado && trucoMatchView != null)
+                    ? trucoMatchView.processarClique(x, y)
+                    : trucoTableView.processarClique(x, y);
             if (sairParaSalao) {
                 processarRetornoB();
             }
@@ -275,6 +281,8 @@ public class ScreenSaver extends JPanel implements ActionListener {
                     teclasPressionadas.add("S");
                 } else if (estadoAtual == GameState.MENU_BLACKJACK && blackjackTableView != null) {
                     blackjackTableView.processarTecla("STAND");
+                } else if (estadoAtual == GameState.MENU_TRUCO) {
+                    processarComandoTruco("S");
                 }
             }
         });
@@ -318,7 +326,14 @@ public class ScreenSaver extends JPanel implements ActionListener {
         // Teclas de acao do Poker Texas Hold'em
         configurarTeclaAtalhoMesa(im, am, "F", "FOLD");
         configurarTeclaAtalhoMesa(im, am, "C", "CHECK");
+        // Teclas de acao do Poker Texas Hold'em e Truco Paulista
+        configurarTeclaAtalhoMesa(im, am, "F", "FOLD");
+        configurarTeclaAtalhoMesa(im, am, "C", "CHECK");
         configurarTeclaAtalhoMesa(im, am, "R", "RAISE");
+        configurarTeclaAtalhoMesa(im, am, "T", "TRUCO");
+        configurarTeclaAtalhoMesa(im, am, "U", "AUMENTAR");
+        configurarTeclaAtalhoMesa(im, am, "M", "TROCAR_MODO");
+        configurarTeclaAtalhoMesa(im, am, "I", "INDIVIDUAL");
 
         // Tecla N para Nova Mão no Truco ou Poker quando finalizada
         im.put(KeyStroke.getKeyStroke("pressed N"), "press_N");
@@ -326,7 +341,7 @@ public class ScreenSaver extends JPanel implements ActionListener {
             @Override
             public void actionPerformed(ActionEvent e) {
                 if (estadoAtual == GameState.MENU_TRUCO && trucoTableView != null) {
-                    trucoTableView.processarTecla("NOVA_MAO");
+                    processarComandoTruco("NOVA_MAO");
                 } else if (estadoAtual == GameState.MENU_POKER && pokerTableView != null) {
                     pokerTableView.processarTecla("NOVA_MAO");
                 }
@@ -369,7 +384,7 @@ public class ScreenSaver extends JPanel implements ActionListener {
                 if (estadoAtual == GameState.MENU_BLACKJACK && blackjackTableView != null) {
                     blackjackTableView.processarTecla(comando);
                 } else if (estadoAtual == GameState.MENU_TRUCO && trucoTableView != null) {
-                    trucoTableView.processarTecla(comando);
+                    processarComandoTruco(comando);
                 } else if (estadoAtual == GameState.MENU_POKER && pokerTableView != null) {
                     pokerTableView.processarTecla(comando);
                 }
@@ -384,6 +399,12 @@ public class ScreenSaver extends JPanel implements ActionListener {
             public void actionPerformed(ActionEvent e) {
                 if (estadoAtual == GameState.SALAO) {
                     teclasPressionadas.add(codigoFisico);
+                } else if (estadoAtual == GameState.MENU_TRUCO) {
+                    if ("A".equals(codigoFisico)) {
+                        processarComandoTruco("ACEITAR");
+                    } else if ("D".equals(codigoFisico)) {
+                        processarComandoTruco("DUPLAS");
+                    }
                 }
             }
         });
@@ -539,6 +560,11 @@ public class ScreenSaver extends JPanel implements ActionListener {
 
             // Seleção unificada da mesa mais próxima para interação
             atualizarMesaMaisProxima();
+        }
+        if (estadoAtual == GameState.MENU_TRUCO && !usandoTrucoRoundLegado && trucoMatchView != null) {
+            trucoMatchView.atualizarTemporizacao(dt);
+        }
+        if (false) {
         }
     }
 
@@ -880,7 +906,16 @@ public class ScreenSaver extends JPanel implements ActionListener {
                     + "  |  Empate: " + formatarFichas(retornoEmpate));
         }
 
-        if (trucoRound != null && !trucoRound.isFinalizada()) {
+        if (!usandoTrucoRoundLegado && trucoMatchView != null && trucoMatchView.getMatch() != null
+                && !trucoMatchView.getMatch().isPartidaFinalizada()) {
+            model.TrucoMatch tm = trucoMatchView.getMatch();
+            String extra = tm.isPedidoTrucoPendente()
+                    ? "  |  Pedido: " + tm.getValorPropostoTruco() + " pts (" + tm.getNomeQuemPediuTruco() + ")"
+                    : "";
+            linhas.add("Truco (" + tm.getModo().getNomeExibicao() + ")  |  Placar: "
+                    + tm.getPontosEquipeJogador() + " × " + tm.getPontosEquipeAdversaria() + " (até 12)"
+                    + "  |  Mão vale: " + tm.getValorMaoAtual() + " pt(s)" + extra);
+        } else if (trucoRound != null && !trucoRound.isFinalizada()) {
             linhas.add("Truco  |  Sem aposta em fichas  |  Em disputa: "
                     + trucoRound.getPontosEmDisputa() + " ponto"
                     + "  |  Vazas: Você " + trucoRound.getVazasVencidasJogador()
@@ -1036,7 +1071,11 @@ public class ScreenSaver extends JPanel implements ActionListener {
      */
     private void desenharMenuTruco(Graphics2D g2d) {
         if (trucoTableView != null) {
+        if (!usandoTrucoRoundLegado && trucoMatchView != null) {
+            trucoMatchView.render(g2d, getWidth(), getHeight());
+        } else if (trucoTableView != null) {
             trucoTableView.render(g2d, getWidth(), getHeight());
+        }
         }
     }
 
@@ -1067,6 +1106,7 @@ public class ScreenSaver extends JPanel implements ActionListener {
     public void setTrucoRound(TrucoRound trucoRound) {
         if (trucoRound != null) {
             this.trucoRound = trucoRound;
+            this.usandoTrucoRoundLegado = true;
         }
     }
 
@@ -1074,11 +1114,30 @@ public class ScreenSaver extends JPanel implements ActionListener {
         return trucoTableView;
     }
 
-    public void processarComandoTruco(String comando) {
-        if (estadoAtual == GameState.MENU_TRUCO && trucoTableView != null) {
-            trucoTableView.processarTecla(comando);
+    public TrucoMatchView getTrucoMatchView() {
+        return trucoMatchView;
+    }
+
+    /**
+     * Avança manualmente o temporizador visual do Truco (usado em testes determinísticos sem Thread.sleep).
+     * Respeita a regra de pausa automática: só avança quando o painel estiver em {@link GameState#MENU_TRUCO}.
+     */
+    public void avancarTempoTruco(double segundos) {
+        if (estadoAtual == GameState.MENU_TRUCO && !usandoTrucoRoundLegado && trucoMatchView != null) {
+            trucoMatchView.atualizarTemporizacao(segundos);
         }
     }
+
+    public void processarComandoTruco(String comando) {
+        if (estadoAtual == GameState.MENU_TRUCO) {
+            if (!usandoTrucoRoundLegado && trucoMatchView != null) {
+                trucoMatchView.processarTecla(comando);
+            } else if (trucoTableView != null) {
+                trucoTableView.processarTecla(comando);
+            }
+        }
+    }
+
 
     public PokerEngine getPokerEngine() {
         return pokerEngine;
