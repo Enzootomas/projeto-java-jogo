@@ -40,6 +40,7 @@ public class TestePokerHoldem {
         testarShowdownSplitPotEFichaImparForaDePosicao();
         testarAllInExcessoNaoIgualadoERunoutAutomatico();
         testarSnapshotsImutaveisEIsolamentoDaIAPokerSimpleAI();
+        testarLimitesAumentoAvaliacaoAtualEDistribuicaoSemDuplicatas();
 
         System.out.println("\n----------------------------------------------------");
         System.out.println("Total de verificacoes (Poker Hold'em): " + totalVerificacoes);
@@ -458,5 +459,61 @@ public class TestePokerHoldem {
                 "Bot formou Trinca de Ases");
         afirme(jogo.getResultadoMao() == PokerRoundResult.JOGADOR_VENCEU_SHOWDOWN,
                 "Sequencia do Jogador superou a Trinca de Ases do Bot no Showdown");
+    }
+
+    private static void testarLimitesAumentoAvaliacaoAtualEDistribuicaoSemDuplicatas() {
+        System.out.println("\n8. Testando Limites de Aumento, Avaliacao Atual da Mao e Zero Cartas Duplicadas:");
+
+        List<Card> cartas = List.of(
+                c(Rank.AS, Suit.ESPADAS), c(Rank.DOIS, Suit.PAUS),
+                c(Rank.AS, Suit.COPAS), c(Rank.SETE, Suit.OUROS),
+                c(Rank.AS, Suit.OUROS), c(Rank.REI, Suit.COPAS), c(Rank.QUATRO, Suit.PAUS),
+                c(Rank.NOVE, Suit.OUROS), c(Rank.TRES, Suit.ESPADAS)
+        );
+        TexasHoldemGame jogoLimites = new TexasHoldemGame(
+                1000L, 140L, 50L, 100L,
+                new Deck(cartas),
+                botPassivoSemprePagaOuPassa(),
+                PokerParticipant.JOGADOR
+        );
+        jogoLimites.iniciarNovaMao();
+        afirme(jogoLimites.getAumentoMinimoJogador() == 40L,
+                "Aumento minimo ajustado ao stack efetivo restante do Bot (40)");
+        afirme(jogoLimites.getAumentoMaximoJogador() == 900L,
+                "Aumento maximo reflete o saldo restante do jogador apos pagar (900)");
+        afirme(jogoLimites.getMelhorMaoAtualJogador() == null,
+                "Antes do Flop, getMelhorMaoAtualJogador() retorna null");
+        afirme(jogoLimites.aumentar(40L),
+                "Aumento efetivo de 40 colocando o Bot short-stack em all-in e aceito");
+        afirme(jogoLimites.getEstagioAtual() == PokerStage.SHOWDOWN,
+                "Apos call de all-in do Bot short-stack, mao corre ao Showdown");
+        afirme(jogoLimites.getMelhorMaoAtualJogador() != null
+                        && jogoLimites.getMelhorMaoAtualJogador().getCategoria() == PokerHandRank.TRINCA,
+                "Melhor mao atual do jogador no Showdown coincide com Trinca de Ases");
+
+        TexasHoldemGame jogoProducao = new TexasHoldemGame(
+                1000L, 1000L, 50L, 100L,
+                new Deck(),
+                true,
+                false,
+                botPassivoSemprePagaOuPassa(),
+                PokerParticipant.JOGADOR
+        );
+        afirme(jogoProducao.iniciarNovaMao(), "Partida com baralho de producao iniciada");
+        jogoProducao.pagar();
+        afirme(jogoProducao.getMelhorMaoAtualJogador() != null,
+                "No Flop, getMelhorMaoAtualJogador() ja avalia as 5 cartas disponiveis");
+        jogoProducao.passar();
+        jogoProducao.passar();
+        jogoProducao.passar();
+
+        java.util.Set<Card> todasCartas = new java.util.HashSet<>();
+        todasCartas.addAll(jogoProducao.getMaoJogador());
+        todasCartas.addAll(jogoProducao.getCartasVisiveisBot());
+        todasCartas.addAll(jogoProducao.getCartasComunitarias());
+        afirme(todasCartas.size() == 9,
+                "Distribuicao de producao tem exatamente 9 cartas distintas (2 jogador + 2 bot + 5 comunitarias)");
+        afirme(jogoProducao.getSaldoJogador() + jogoProducao.getSaldoBot() == 2000L,
+                "Conservacao exata das 2000 fichas no baralho de producao");
     }
 }
