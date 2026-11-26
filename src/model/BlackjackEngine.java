@@ -158,4 +158,60 @@ public interface BlackjackEngine {
      * @return pontuacao visivel do dealer.
      */
     int getPontosDealerVisiveis();
+
+    /**
+     * Retorna o lucro liquido possivel em caso de vitoria comum (1:1) para a aposta atual
+     * enquanto houver rodada ativa ({@link RoundState#TURNO_JOGADOR}).
+     * Ex.: aposta de 100 -> lucro de 100.
+     *
+     * @return lucro liquido possivel em vitoria comum, ou {@code 0} sem rodada ativa.
+     */
+    default long getLucroPossivelVitoriaComum() {
+        if (getEstadoRodada() != RoundState.TURNO_JOGADOR || getApostaAtual() <= 0L) {
+            return 0L;
+        }
+        return getApostaAtual();
+    }
+
+    /**
+     * Retorna o retorno total possivel (aposta + lucro) em caso de vitoria comum (1:1)
+     * para a aposta atual enquanto houver rodada ativa ({@link RoundState#TURNO_JOGADOR}).
+     * Ex.: aposta de 100 -> retorno total de 200.
+     *
+     * @return retorno total possivel em vitoria comum, ou {@code 0} sem rodada ativa.
+     */
+    default long getRetornoTotalPossivelVitoriaComum() {
+        if (getEstadoRodada() != RoundState.TURNO_JOGADOR || getApostaAtual() <= 0L) {
+            return 0L;
+        }
+        return Math.addExact(getApostaAtual(), getApostaAtual());
+    }
+
+    /**
+     * Retorna o lucro liquido correspondente ao pagamento 3:2 de Blackjack Natural
+     * para a aposta atual enquanto houver rodada ativa ({@link RoundState#TURNO_JOGADOR}).
+     * Ex.: aposta de 100 -> lucro de 150.
+     *
+     * @return lucro liquido de referencia 3:2, ou {@code 0} sem rodada ativa.
+     */
+    default long getLucroPossivelBlackjackNatural() {
+        if (getEstadoRodada() != RoundState.TURNO_JOGADOR || getApostaAtual() <= 0L) {
+            return 0L;
+        }
+        return Math.multiplyExact(getApostaAtual() / 2L, 3L);
+    }
+
+    /**
+     * Retorna o retorno total (aposta + lucro 3:2) correspondente a um Blackjack Natural
+     * para a aposta atual enquanto houver rodada ativa ({@link RoundState#TURNO_JOGADOR}).
+     * Ex.: aposta de 100 -> retorno total de 250.
+     *
+     * @return retorno total de referencia 3:2, ou {@code 0} sem rodada ativa.
+     */
+    default long getRetornoTotalPossivelBlackjackNatural() {
+        if (getEstadoRodada() != RoundState.TURNO_JOGADOR || getApostaAtual() <= 0L) {
+            return 0L;
+        }
+        return Math.addExact(getApostaAtual(), getLucroPossivelBlackjackNatural());
+    }
 }

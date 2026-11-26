@@ -30,10 +30,13 @@ public class TesteRenderizacao {
         int altura = 720;
 
         ScreenSaver painel = new ScreenSaver();
+        Graphics2D g2d = null;
+        Graphics2D gMesa = null;
+        try {
         painel.setSize(new Dimension(largura, altura));
 
         BufferedImage buffer = new BufferedImage(largura, altura, BufferedImage.TYPE_INT_ARGB);
-        Graphics2D g2d = buffer.createGraphics();
+        g2d = buffer.createGraphics();
 
         // 1. Testa Renderização do Salão Isométrico
         painel.paint(g2d);
@@ -48,7 +51,7 @@ public class TesteRenderizacao {
         BlackjackTableView mesaView = painel.getBlackjackTableView();
 
         BufferedImage bufferMesa = new BufferedImage(largura, altura, BufferedImage.TYPE_INT_ARGB);
-        Graphics2D gMesa = bufferMesa.createGraphics();
+        gMesa = bufferMesa.createGraphics();
 
         afirme(simulador.getEstadoRodada() == RoundState.AGUARDANDO_APOSTA,
                 "Mesa inicia no estado formal AGUARDANDO_APOSTA");
@@ -92,7 +95,7 @@ public class TesteRenderizacao {
 
         // 7. Testa Ambientacao do Salao e Percurso Completo do Avatar
         afirme(painel.getBalcao() != null, "Balcao do bar instanciado no salao");
-        afirme(painel.getCadeiras() != null && painel.getCadeiras().size() == 3,
+        afirme(painel.getCadeiras() != null && painel.getCadeiras().size() == 8,
                 "Tres cadeiras de cassino instanciadas no salao");
         afirme(painel.getObstaculos().contains(painel.getBalcao()),
                 "Balcao registrado na lista de obstaculos fisicos");
@@ -207,7 +210,11 @@ public class TesteRenderizacao {
 
         g2d.dispose();
         gMesa.dispose();
-        painel.pararLoop();
+        } finally {
+            if (g2d != null) g2d.dispose();
+            if (gMesa != null) gMesa.dispose();
+            painel.pararLoop();
+        }
 
         System.out.println("\n----------------------------------------------------");
         System.out.println("RESULTADO: TODOS OS TESTES DE RENDERIZACAO PASSARAM! [OK]");

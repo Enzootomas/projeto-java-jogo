@@ -237,6 +237,7 @@ public class TesteInterfaceTruco {
 
         ScreenSaver painel = new ScreenSaver();
         try {
+            painel.setTrucoRound(painel.getTrucoRound());
             painel.setEstadoAtual(ScreenSaver.GameState.SALAO);
 
             // Posiciona jogador proximo da mesa de Truco
@@ -340,6 +341,7 @@ public class TesteInterfaceTruco {
             painel.setEstadoAtual(ScreenSaver.GameState.MENU_TRUCO);
             TrucoTableView view = painel.getTrucoTableView();
 
+            painel.setTrucoRound(painel.getTrucoRound());
             BufferedImage img = new BufferedImage(1024, 768, BufferedImage.TYPE_INT_ARGB);
             Graphics2D g = img.createGraphics();
 
