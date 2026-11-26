@@ -245,6 +245,8 @@ Motor Heads-Up (1 Jogador vs. 1 Bot) com fichas virtuais (`long`), totalmente de
 
 ```mermaid
 classDiagram
+    PokerTableView o-- PokerEngine : consome contrato
+    ScreenSaver *-- PokerTableView : MENU_POKER
     PokerEngine <|.. TexasHoldemGame : implementa
     TexasHoldemGame *-- Deck : baralho 52 cartas
     TexasHoldemGame o-- PokerBotStrategy : composicao / injecao
@@ -264,11 +266,14 @@ classDiagram
         +aumentar(long valorAcimaDaApostaAtual) boolean
         +getEstagioAtual() PokerStage
         +getResultadoMao() PokerRoundResult
+        +getAumentoMinimoJogador() long
+        +getAumentoMaximoJogador() long
         +getAcoesValidasJogador() Set~PokerAction~
         +getMaoJogador() List~Card~
         +getCartasComunitarias() List~Card~
         +getCartasVisiveisBot() List~Card~
         +hasCartasOcultasBot() boolean
+        +getMelhorMaoAtualJogador() EvaluatedPokerHand
         +getMelhorMaoJogadorShowdown() EvaluatedPokerHand
         +getMelhorMaoBotShowdown() EvaluatedPokerHand
     }
