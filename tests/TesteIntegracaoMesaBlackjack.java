@@ -55,6 +55,7 @@ public class TesteIntegracaoMesaBlackjack {
         System.out.println("1. Testando Inicializacao Padrao do ScreenSaver com BlackjackGame:");
 
         ScreenSaver painel = new ScreenSaver();
+        try {
         BlackjackEngine engine = painel.getBlackjackEngine();
 
         afirme(engine != null, "BlackjackEngine foi inicializado no ScreenSaver");
@@ -73,7 +74,9 @@ public class TesteIntegracaoMesaBlackjack {
         afirme(painel.getBlackjackTableView().getEngine() == engine,
                 "BlackjackTableView e ScreenSaver compartilham a mesma instancia de BlackjackGame");
 
-        painel.pararLoop();
+        } finally {
+            painel.pararLoop();
+        }
         System.out.println();
     }
 
@@ -81,6 +84,7 @@ public class TesteIntegracaoMesaBlackjack {
         System.out.println("2. Testando Ocultamento de 'Modo de demonstracao' com BlackjackGame:");
 
         ScreenSaver painel = new ScreenSaver();
+        try {
 
         // 1. Com BlackjackGame ativo, 'Modo de demonstracao' deve estar ausente
         BlackjackTableView viewReal = painel.getBlackjackTableView();
@@ -100,7 +104,9 @@ public class TesteIntegracaoMesaBlackjack {
         afirme(painel.getBlackjackTableView().getEngine() instanceof BlackjackMockSimulator,
                 "Simulador pode ser injetado com sucesso para fins de teste");
 
-        painel.pararLoop();
+        } finally {
+            painel.pararLoop();
+        }
         System.out.println();
     }
 
@@ -127,6 +133,7 @@ public class TesteIntegracaoMesaBlackjack {
         BlackjackGame motorControlado = new BlackjackGame(1000L, deckControlado);
 
         ScreenSaver painel = new ScreenSaver();
+        try {
         painel.setBlackjackEngine(motorControlado);
 
         afirme(painel.getBlackjackEngine().getSaldoVirtual() == 1000L, "Saldo inicial configurado em 1000 fichas");
@@ -174,7 +181,9 @@ public class TesteIntegracaoMesaBlackjack {
         afirme(motorControlado.getUltimoRetornoTotalCreditado() == 400L, "Retorno total creditado foi 400");
         afirme(motorControlado.getLucroLiquidoUltimaRodada() == 200L, "Lucro liquido da rodada foi +200");
 
-        painel.pararLoop();
+        } finally {
+            painel.pararLoop();
+        }
         System.out.println();
     }
 
@@ -191,6 +200,7 @@ public class TesteIntegracaoMesaBlackjack {
         BlackjackGame motor = new BlackjackGame(1000L, deck);
 
         ScreenSaver painel = new ScreenSaver();
+        try {
         painel.setBlackjackEngine(motor);
 
         // Abre a mesa de Blackjack
@@ -227,7 +237,9 @@ public class TesteIntegracaoMesaBlackjack {
         afirme(motorRetornado.getPontosJogador() == 17, "Mao do jogador preservada com 17 pontos");
         afirme(motorRetornado.getApostaAtual() == 150L, "Aposta de 150 fichas preservada");
 
-        painel.pararLoop();
+        } finally {
+            painel.pararLoop();
+        }
         System.out.println();
     }
 
@@ -246,6 +258,7 @@ public class TesteIntegracaoMesaBlackjack {
         BlackjackGame motor = new BlackjackGame(1000L, deck);
 
         ScreenSaver painel = new ScreenSaver();
+        try {
         painel.setBlackjackEngine(motor);
 
         // Aposta de 100 fichas
@@ -278,7 +291,9 @@ public class TesteIntegracaoMesaBlackjack {
         gBJ.dispose();
         afirme(true, "Banner de Blackjack Natural renderizado na tela sem falhas ou overflow");
 
-        painel.pararLoop();
+        } finally {
+            painel.pararLoop();
+        }
         System.out.println();
     }
 
