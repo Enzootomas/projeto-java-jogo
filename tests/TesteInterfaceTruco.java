@@ -237,6 +237,7 @@ public class TesteInterfaceTruco {
 
         ScreenSaver painel = new ScreenSaver();
         try {
+            painel.setTrucoRound(painel.getTrucoRound());
             painel.setEstadoAtual(ScreenSaver.GameState.SALAO);
 
             // Posiciona jogador proximo da mesa de Truco
