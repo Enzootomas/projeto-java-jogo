@@ -135,6 +135,39 @@ public interface PokerEngine {
     long getApostaBotNaRua();
 
     /**
+     * Retorna o total liquido de fichas que o jogador ja comprometeu na mao atual
+     * (somando blinds e apostas em todas as ruas, ja descontando eventual excesso devolvido).
+     *
+     * @return total comprometido pelo jogador na mao atual ({@code >= 0}).
+     */
+    long getTotalComprometidoJogadorNaMao();
+
+    /**
+     * Retorna o retorno total potencial (pote atual) caso o jogador venca a mao
+     * com as contribuicoes ja presentes na mesa, ou {@code 0} se nao houver mao em andamento.
+     *
+     * @return retorno total potencial em caso de vitoria no estado atual da mao.
+     */
+    long getRetornoTotalPotencialVitoriaAtual();
+
+    /**
+     * Retorna o lucro liquido potencial (pote atual menos o total comprometido pelo jogador)
+     * caso o jogador venca a mao no estado atual, ou {@code 0} se nao houver mao em andamento.
+     *
+     * @return lucro liquido potencial em caso de vitoria no estado atual da mao.
+     */
+    long getLucroLiquidoPotencialVitoriaAtual();
+
+    /**
+     * Retorna a parcela exata do pote que o jogador receberia em caso de empate (Split Pot)
+     * no estado atual da mao (considerando a regra da ficha impar para o jogador fora de posicao),
+     * ou {@code 0} se nao houver mao em andamento.
+     *
+     * @return retorno potencial do jogador em divisao de pote.
+     */
+    long getRetornoPotencialEmpateAtual();
+
+    /**
      * Retorna quantas fichas o jogador precisa colocar para igualar a aposta atual do Bot
      * (ja limitado ao saldo disponivel do jogador em caso de all-in).
      *

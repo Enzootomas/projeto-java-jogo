@@ -61,6 +61,7 @@ public class TexasHoldemGame implements PokerEngine {
     private long poteTotal;
     private long apostaJogadorNaRua;
     private long apostaBotNaRua;
+    private long totalComprometidoJogadorNaMao;
 
     private PokerStage estagioAtual;
     private PokerRoundResult resultadoMao;
@@ -230,6 +231,7 @@ public class TexasHoldemGame implements PokerEngine {
         this.botaoDealer = candidatoBotao;
         this.proximoBotaoDealer = candidatoBotao.oponente();
         this.poteTotal = 0L;
+        this.totalComprometidoJogadorNaMao = 0L;
         this.apostaJogadorNaRua = 0L;
         this.apostaBotNaRua = 0L;
         this.aumentosNaRua = 0;
@@ -605,6 +607,7 @@ public class TexasHoldemGame implements PokerEngine {
             long efetivo = Math.min(quantidadeSolicitada, saldoJogador);
             this.saldoJogador = Math.subtractExact(this.saldoJogador, efetivo);
             this.apostaJogadorNaRua = Math.addExact(this.apostaJogadorNaRua, efetivo);
+            this.totalComprometidoJogadorNaMao = Math.addExact(this.totalComprometidoJogadorNaMao, efetivo);
             this.poteTotal = Math.addExact(this.poteTotal, efetivo);
         } else {
             long efetivo = Math.min(quantidadeSolicitada, saldoBot);
@@ -625,6 +628,7 @@ public class TexasHoldemGame implements PokerEngine {
             this.apostaJogadorNaRua = maximoCoberturaBot;
             this.poteTotal = Math.subtractExact(this.poteTotal, excesso);
             this.saldoJogador = Math.addExact(this.saldoJogador, excesso);
+            this.totalComprometidoJogadorNaMao = Math.subtractExact(this.totalComprometidoJogadorNaMao, excesso);
         }
 
         long maximoCoberturaJogador = Math.addExact(apostaJogadorNaRua, saldoJogador);
@@ -748,6 +752,40 @@ public class TexasHoldemGame implements PokerEngine {
     @Override
     public long getValorParaPagarJogador() {
         return getValorParaPagar(PokerParticipant.JOGADOR);
+    }
+
+    @Override
+    public long getTotalComprometidoJogadorNaMao() {
+        return totalComprometidoJogadorNaMao;
+    }
+
+    @Override
+    public long getRetornoTotalPotencialVitoriaAtual() {
+        if (!estagioAtual.isMaoEmAndamento()) {
+            return 0L;
+        }
+        return poteTotal;
+    }
+
+    @Override
+    public long getLucroLiquidoPotencialVitoriaAtual() {
+        if (!estagioAtual.isMaoEmAndamento()) {
+            return 0L;
+        }
+        return Math.max(0L, Math.subtractExact(poteTotal, totalComprometidoJogadorNaMao));
+    }
+
+    @Override
+    public long getRetornoPotencialEmpateAtual() {
+        if (!estagioAtual.isMaoEmAndamento()) {
+            return 0L;
+        }
+        long metade = poteTotal / 2L;
+        long fichaImpar = poteTotal % 2L;
+        if (fichaImpar == 1L && botaoDealer.oponente() == PokerParticipant.JOGADOR) {
+            return Math.addExact(metade, 1L);
+        }
+        return metade;
     }
 
     @Override
