@@ -13,6 +13,7 @@ import model.PokerStage;
 import model.Rank;
 import model.Suit;
 import model.TexasHoldemGame;
+import model.TexasHoldemTableGame;
 import view.PokerTableView;
 import view.ScreenSaver;
 
@@ -124,8 +125,10 @@ public class TesteInterfacePoker {
 
             PokerEngine engine = painel.getPokerEngine();
             afirme(engine != null, "PokerEngine deve estar inicializado no ScreenSaver.");
-            afirme(engine instanceof TexasHoldemGame,
-                    "ScreenSaver deve iniciar com o motor oficial TexasHoldemGame.");
+            afirme(engine instanceof TexasHoldemTableGame,
+                    "ScreenSaver deve iniciar com o motor oficial de 6 participantes TexasHoldemTableGame.");
+            afirme(((TexasHoldemTableGame) engine).getSeats().size() == 6,
+                    "Mesa oficial de Poker deve iniciar com 6 lugares (1 jogador + 5 Bots).");
             afirme(painel.getPokerTableView() != null, "PokerTableView deve estar inicializada.");
             afirme(painel.getPokerTableView().getEngine() == engine,
                     "PokerTableView e ScreenSaver devem compartilhar a mesma instância de PokerEngine.");

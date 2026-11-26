@@ -14,6 +14,7 @@ import model.PokerParticipant;
 import model.Rank;
 import model.Suit;
 import model.TexasHoldemGame;
+import model.TexasHoldemTableGame;
 import model.TrucoPlayer;
 import model.TrucoRound;
 import view.ScreenSaver;
@@ -227,7 +228,14 @@ public class TestePolimentoLobbyEHUD {
         System.out.println("[4/5] Testando estado discreto sem rodadas ativas e devolução de aposta não coberta...");
         ScreenSaver painel = new ScreenSaver();
         try {
-            // Finaliza Poker por Fold e Truco por 2x0 (Blackjack já começa em AGUARDANDO_APOSTA)
+            // Finaliza Poker por Fold (aguardando Bots UTG na mesa de 6 lugares) e Truco por 2x0
+            if (painel.getPokerEngine() instanceof TexasHoldemTableGame) {
+                TexasHoldemTableGame mesaPoker = (TexasHoldemTableGame) painel.getPokerEngine();
+                int limite = 10;
+                while (mesaPoker.isAguardandoAcaoBot() && limite-- > 0) {
+                    mesaPoker.executarPassoBot();
+                }
+            }
             painel.getPokerEngine().desistir();
             TrucoRound truco = new TrucoRound(
                     Arrays.asList(c(Rank.TRES, Suit.PAUS), c(Rank.TRES, Suit.COPAS), c(Rank.TRES, Suit.OUROS)),
