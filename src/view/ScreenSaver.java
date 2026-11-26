@@ -20,6 +20,8 @@ import javax.swing.KeyStroke;
 import javax.swing.Timer;
 import model.BlackjackEngine;
 import model.BlackjackGame;
+import model.PokerEngine;
+import model.TexasHoldemGame;
 import model.TrucoDeck;
 import model.TrucoPlayer;
 import model.TrucoRound;
@@ -88,6 +90,8 @@ public class ScreenSaver extends JPanel implements ActionListener {
     private TrucoPlayer proximoPrimeiroDaMao = TrucoPlayer.JOGADOR;
 
     // Interface da Mesa de Poker (Texas Hold'em)
+    // Interface e Motor da Mesa de Poker (Texas Hold'em)
+    private PokerEngine pokerEngine;
     private PokerTableView pokerTableView;
 
     // Loop e Tempo
@@ -199,7 +203,9 @@ public class ScreenSaver extends JPanel implements ActionListener {
      * Inicializa a interface da mesa de Poker Texas Hold'em.
      */
     private void configurarMesaPoker() {
-        this.pokerTableView = new PokerTableView(this);
+        this.pokerEngine = new TexasHoldemGame();
+        this.pokerEngine.iniciarNovaMao();
+        this.pokerTableView = new PokerTableView(this, this.pokerEngine);
     }
 
     private void configurarMouseListener() {
@@ -866,6 +872,21 @@ public class ScreenSaver extends JPanel implements ActionListener {
     public void processarComandoTruco(String comando) {
         if (estadoAtual == GameState.MENU_TRUCO && trucoTableView != null) {
             trucoTableView.processarTecla(comando);
+        }
+    }
+
+    public PokerEngine getPokerEngine() {
+        return pokerEngine;
+    }
+
+    /**
+     * Permite conectar qualquer implementação compatível com o contrato {@link PokerEngine}
+     * (produção ou motor determinístico de testes), atualizando a {@link PokerTableView}.
+     */
+    public void setPokerEngine(PokerEngine engine) {
+        if (engine != null) {
+            this.pokerEngine = engine;
+            this.pokerTableView = new PokerTableView(this, engine);
         }
     }
 

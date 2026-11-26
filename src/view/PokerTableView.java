@@ -1,8 +1,14 @@
 package view;
 
 import model.Card;
-import model.Rank;
+import model.EvaluatedPokerHand;
+import model.PokerAction;
+import model.PokerEngine;
+import model.PokerParticipant;
+import model.PokerRoundResult;
+import model.PokerStage;
 import model.Suit;
+import model.TexasHoldemGame;
 
 import java.awt.BasicStroke;
 import java.awt.Color;
@@ -17,72 +23,22 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 /**
- * Interface gráfica completa e interativa da Mesa de Poker (Texas Hold'em 1 vs 1).
+ * Interface gráfica interativa da Mesa de Poker Texas Hold'em (1 vs 1) acoplada ao
+ * contrato oficial {@link PokerEngine}.
  *
- * <p>Responsabilidades visuais e de navegação:</p>
- * <ul>
- *   <li>Tampo oval de feltro bordô/vinho nobre (Burgundy Poker Table) com borda de mogno.</li>
- *   <li>Área do Bot: exibe avatar, fichas e exatamente 2 cartas fechadas (versos),
- *       reveladas apenas no Showdown quando autorizado pelo fluxo do jogo.</li>
- *   <li>Área Central (The Board): reserva cinco posições para as cartas comunitárias,
- *       exibindo apenas as cartas reveladas na fase atual (Flop: 3, Turn: 4, River/Showdown: 5).</li>
- *   <li>Pote central com contagem de fichas virtuais.</li>
- *   <li>Área do Jogador: exibe as 2 cartas privativas (Hole Cards) abertas, classificação da mão e stack.</li>
- *   <li>Controles contextuais: exibe dinamicamente "Passar" (Check) ou "Pagar" (Call),
- *       habilita "Aumentar" (Raise) e "Desistir" (Fold), além de "Voltar ao Salão" (B) e "Nova Mão" (N).</li>
- *   <li>Indicação clara de "Poker (Texas Hold'em) - Em desenvolvimento (Aguardando motor oficial)".</li>
- *   <li>Preservação do estado da mão entre alternâncias de telas (E / B).</li>
- * </ul>
+ * <p>Toda a lógica de regras, apostas, blinds, avaliação de mãos, turnos do Bot e
+ * ocultação de cartas permanece concentrada no motor ({@link TexasHoldemGame}).
+ * A interface apenas consulta o estado público exposto por {@link PokerEngine} e
+ * encaminha as ações do jogador.</p>
  */
 public class PokerTableView {
 
-    public enum PokerPhase {
-        PRE_FLOP("Pré-Flop", 0),
-        FLOP("Flop", 3),
-        TURN("Turn", 4),
-        RIVER("River", 5),
-        SHOWDOWN("Showdown", 5);
-
-        private final String nome;
-        private final int cartasAbertas;
-
-        PokerPhase(String nome, int cartasAbertas) {
-            this.nome = nome;
-            this.cartasAbertas = cartasAbertas;
-        }
-
-        public String getNome() {
-            return nome;
-        }
-
-        public int getCartasAbertas() {
-            return cartasAbertas;
-        }
-    }
-
     private final ScreenSaver screenSaver;
+    private final PokerEngine engine;
     private final NumberFormat formatadorMoeda = NumberFormat.getNumberInstance(Locale.forLanguageTag("pt-BR"));
-
-    // Fases e Estado da Mão
-    private PokerPhase faseAtual = PokerPhase.PRE_FLOP;
-    private boolean maoFinalizada = false;
-    private String mensagemDesfecho = "";
-    private boolean botCartasReveladas = false;
-
-    // Fichas e Pote (long para compatibilidade com o sistema de fichas)
-    private long poteCentral = 100L;
-    private long apostaJogador = 50L;
-    private long apostaBot = 50L;
-    private long stackJogador = 950L;
-    private long stackBot = 950L;
-    private long valorAumento = 50L;
-
-    // Cartas de exemplo para o layout (substituíveis pelo motor do colega)
-    private final List<Card> holeCardsJogador = new ArrayList<>();
-    private final List<Card> holeCardsBot = new ArrayList<>();
-    private final List<Card> boardComunitario = new ArrayList<>();
 
     // Áreas de interação para cliques do mouse
     private final Rectangle btnFold = new Rectangle();
@@ -91,56 +47,46 @@ public class PokerTableView {
     private final Rectangle btnVoltar = new Rectangle();
     private final Rectangle btnNovaMao = new Rectangle();
 
-    // Bounds das 5 cartas comunitárias para verificação
-    private final List<Rectangle> boundsBoard = new ArrayList<>();
+    // Bounds das 5 cartas comunitárias para verificação e layout
+    private final List<Rectangle> boundsBoard = new ArrayList<>(5);
 
-    public PokerTableView(ScreenSaver screenSaver) {
-        this.screenSaver = screenSaver;
-        iniciarNovaMaoExemplo();
-    }
+    // Mensagem temporária de feedback para ações inválidas ou falta de fichas
+    private String mensagemAlerta = "";
+    private long alertaExpiraEmMs = 0L;
 
     /**
-     * Inicializa uma mão de exemplo rica para apresentação do layout do Texas Hold'em.
+     * Cria a view de Poker inicializando um motor oficial {@link TexasHoldemGame} padrão
+     * com uma mão pronta para jogar.
+     *
+     * @param screenSaver referência ao painel principal do salão (pode ser nulo em testes isolados).
      */
-    public void iniciarNovaMaoExemplo() {
-        this.faseAtual = PokerPhase.PRE_FLOP;
-        this.maoFinalizada = false;
-        this.mensagemDesfecho = "";
-        this.botCartasReveladas = false;
-
-        this.apostaJogador = 50L;
-        this.apostaBot = 50L;
-        this.poteCentral = 100L;
-
-        // Atualiza stack com saldo do jogador se disponível
-        if (screenSaver != null && screenSaver.getBlackjackEngine() != null) {
-            this.stackJogador = screenSaver.getBlackjackEngine().getSaldoVirtual();
-        }
-
-        // 2 Hole Cards do Jogador: Ás de Espadas e Rei de Copas
-        this.holeCardsJogador.clear();
-        this.holeCardsJogador.add(new Card(Suit.ESPADAS, Rank.AS));
-        this.holeCardsJogador.add(new Card(Suit.COPAS, Rank.REI));
-
-        // 2 Hole Cards do Bot: Dama de Ouros e Valete de Paus (fechadas até Showdown)
-        this.holeCardsBot.clear();
-        this.holeCardsBot.add(new Card(Suit.OUROS, Rank.DAMA));
-        this.holeCardsBot.add(new Card(Suit.PAUS, Rank.VALETE));
-
-        // 5 Cartas Comunitárias do Board:
-        // Flop: 10 de Copas, 2 de Espadas, Ás de Ouros
-        // Turn: 7 de Paus
-        // River: Rei de Espadas (completando Dois Pares de Ás e Rei para o jogador)
-        this.boardComunitario.clear();
-        this.boardComunitario.add(new Card(Suit.COPAS, Rank.DEZ));
-        this.boardComunitario.add(new Card(Suit.ESPADAS, Rank.DOIS));
-        this.boardComunitario.add(new Card(Suit.OUROS, Rank.AS));
-        this.boardComunitario.add(new Card(Suit.PAUS, Rank.SETE));
-        this.boardComunitario.add(new Card(Suit.ESPADAS, Rank.REI));
+    public PokerTableView(ScreenSaver screenSaver) {
+        this(screenSaver, criarMotorPadraoIniciado());
     }
 
     /**
-     * Renderiza todos os elementos visuais da mesa de Poker Texas Hold'em.
+     * Cria a view de Poker acoplada a uma instância específica de {@link PokerEngine}
+     * (produção ou motor determinístico injetado em testes).
+     *
+     * @param screenSaver referência ao painel principal do salão (pode ser nulo em testes isolados).
+     * @param engine      implementação de {@link PokerEngine} (não pode ser nula).
+     */
+    public PokerTableView(ScreenSaver screenSaver, PokerEngine engine) {
+        if (engine == null) {
+            throw new IllegalArgumentException("O motor de Poker (PokerEngine) não pode ser nulo.");
+        }
+        this.screenSaver = screenSaver;
+        this.engine = engine;
+    }
+
+    private static PokerEngine criarMotorPadraoIniciado() {
+        TexasHoldemGame motor = new TexasHoldemGame();
+        motor.iniciarNovaMao();
+        return motor;
+    }
+
+    /**
+     * Renderiza todos os elementos visuais da mesa de Poker Texas Hold'em a partir do estado do motor.
      */
     public void render(Graphics2D g, int largura, int altura) {
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
@@ -153,28 +99,32 @@ public class PokerTableView {
         // 2. Tampo da mesa em feltro bordô nobre
         desenharMesaFeltro(g, largura, altura);
 
-        // 3. Cabeçalho e Identificação da Mesa
+        // 3. Cabeçalho, fase atual, blinds e turno
         desenharCabecalho(g, largura);
 
-        // 4. Área do Bot (Topo)
-        desenharAreaBot(g, largura, altura);
+        // 4. Área do Bot (Topo) — consulta estritamente getCartasVisiveisBot() / hasCartasOcultasBot()
+        desenharAreaBot(g, largura);
 
-        // 5. Área Central: Pote e 5 Cartas Comunitárias
+        // 5. Área Central: Pote, última ação e 5 espaços do Board comunitário
         desenharAreaBoardEPot(g, largura, altura);
 
         // 6. Área do Jogador (Base)
         desenharAreaJogador(g, largura, altura);
 
-        // 7. Controles e Ações
+        // 7. Controles contextuais guiados por engine.getAcoesValidasJogador()
         desenharPainelAcoes(g, largura, altura);
 
         // 8. Botão Voltar ao Salão (B)
-        desenharBotaoVoltar(g, largura, altura);
+        desenharBotaoVoltar(g, altura);
 
-        // 9. Banner de Desfecho no Showdown ou Fold
-        if (maoFinalizada) {
+        // 9. Banner de Desfecho (Showdown, Desistência ou Aguardando Mão)
+        PokerStage estagio = engine.getEstagioAtual();
+        if (estagio.isMaoFinalizada() || estagio == PokerStage.AGUARDANDO_MAO) {
             desenharBannerDesfecho(g, largura, altura);
         }
+
+        // 10. Alerta temporário (ex.: ação inválida ou saldo insuficiente)
+        desenharAlerta(g, largura, altura);
     }
 
     private void desenharMesaFeltro(Graphics2D g, int largura, int altura) {
@@ -183,17 +133,14 @@ public class PokerTableView {
         int mesaW = largura - (margemX * 2);
         int mesaH = altura - (margemY * 2);
 
-        // Borda externa de mogno escuro almofadado
         g.setColor(new Color(42, 18, 18));
         g.fillRoundRect(margemX - 10, margemY - 10, mesaW + 20, mesaH + 20, 48, 48);
 
-        // Filete dourado ornamental
         g.setColor(new Color(212, 175, 55));
         g.setStroke(new BasicStroke(2.5f));
         g.drawRoundRect(margemX - 5, margemY - 5, mesaW + 10, mesaH + 10, 42, 42);
         g.setStroke(new BasicStroke(1.0f));
 
-        // Feltro bordô com gradiente radial/linear luxuoso
         GradientPaint feltro = new GradientPaint(
                 largura / 2.0f, margemY, new Color(110, 18, 28),
                 largura / 2.0f, margemY + mesaH, new Color(55, 8, 14)
@@ -201,7 +148,6 @@ public class PokerTableView {
         g.setPaint(feltro);
         g.fillRoundRect(margemX, margemY, mesaW, mesaH, 36, 36);
 
-        // Linha interna de demarcação do feltro de Poker
         g.setColor(new Color(212, 175, 55, 70));
         g.setStroke(new BasicStroke(1.5f));
         g.drawRoundRect(margemX + 24, margemY + 24, mesaW - 48, mesaH - 48, 28, 28);
@@ -211,46 +157,76 @@ public class PokerTableView {
     private void desenharCabecalho(Graphics2D g, int largura) {
         int cx = largura / 2;
 
-        // Placa do título principal
         g.setFont(new Font("SansSerif", Font.BOLD, 17));
         g.setColor(new Color(255, 225, 130));
         FontMetrics fm = g.getFontMetrics();
         String titulo = "TEXAS HOLD'EM POKER (1 vs 1)";
-        g.drawString(titulo, cx - (fm.stringWidth(titulo) / 2), 65);
+        g.drawString(titulo, cx - (fm.stringWidth(titulo) / 2), 64);
 
-        // Indicador de modo e fase ativa
+        PokerStage estagio = engine.getEstagioAtual();
+        PokerParticipant turno = engine.getTurnoAtual();
+        String txtTurno;
+        if (turno == PokerParticipant.JOGADOR) {
+            txtTurno = "Sua vez";
+        } else if (turno == PokerParticipant.BOT) {
+            txtTurno = "Turno do Bot";
+        } else {
+            txtTurno = "Mão encerrada";
+        }
+
+        String sub = "Fase: " + estagio.getNomeExibicao().toUpperCase(Locale.ROOT)
+                + "  |  Blinds: " + formatarMoeda(engine.getSmallBlind()) + "/" + formatarMoeda(engine.getBigBlind())
+                + "  |  " + txtTurno;
+
         g.setFont(new Font("SansSerif", Font.BOLD, 11));
-        g.setColor(new Color(255, 190, 70));
-        String sub = "Fase: " + faseAtual.getNome().toUpperCase() + "  |  Modo: Demonstração Visual (Aguardando motor)";
+        g.setColor(new Color(255, 205, 100));
         FontMetrics fmSub = g.getFontMetrics();
         g.drawString(sub, cx - (fmSub.stringWidth(sub) / 2), 82);
     }
 
-    private void desenharAreaBot(Graphics2D g, int largura, int altura) {
+    private void desenharAreaBot(Graphics2D g, int largura) {
         int cx = largura / 2;
-        int yBot = 100;
+        int yBot = 104;
 
-        // Informações do Bot
+        String marcadorDealer = (engine.getBotaoDealer() == PokerParticipant.BOT) ? " [D]" : "";
+        String infoBot = "Bot" + marcadorDealer
+                + " — Stack: " + formatarMoeda(engine.getSaldoBot())
+                + " | Aposta: " + formatarMoeda(engine.getApostaBotNaRua());
+
         g.setFont(new Font("SansSerif", Font.BOLD, 13));
-        g.setColor(new Color(230, 230, 230));
-        String infoBot = "Crupiê / Bot — Stack: " + formatarMoeda(stackBot) + " | Aposta: " + formatarMoeda(apostaBot);
+        g.setColor(new Color(235, 235, 235));
         FontMetrics fm = g.getFontMetrics();
         g.drawString(infoBot, cx - (fm.stringWidth(infoBot) / 2), yBot);
 
-        // As duas cartas do Bot (fechadas até Showdown)
         int cardW = 54;
         int cardH = 76;
         int gap = 12;
-        int startX = cx - cardW - (gap / 2);
+        int qtdCartasBot = Math.max(2, engine.getQuantidadeCartasBot());
+        int totalW = (qtdCartasBot * cardW) + ((qtdCartasBot - 1) * gap);
+        int startX = cx - (totalW / 2);
         int cardY = yBot + 10;
 
-        for (int i = 0; i < 2; i++) {
+        List<Card> cartasVisiveisBot = engine.getCartasVisiveisBot();
+        boolean ocultas = engine.hasCartasOcultasBot();
+
+        for (int i = 0; i < qtdCartasBot; i++) {
             int x = startX + i * (cardW + gap);
-            if (botCartasReveladas && i < holeCardsBot.size()) {
-                desenharCartaAberta(g, holeCardsBot.get(i), x, cardY, cardW, cardH);
-            } else {
+            if (!ocultas && i < cartasVisiveisBot.size()) {
+                desenharCartaAberta(g, cartasVisiveisBot.get(i), x, cardY, cardW, cardH);
+            } else if (engine.getQuantidadeCartasBot() > 0) {
                 desenharCartaFechada(g, x, cardY, cardW, cardH);
+            } else {
+                desenharSlotVazio(g, x, cardY, cardW, cardH, "BOT");
             }
+        }
+
+        EvaluatedPokerHand maoBotShowdown = engine.getMelhorMaoBotShowdown();
+        if (maoBotShowdown != null) {
+            g.setFont(new Font("SansSerif", Font.BOLD, 12));
+            g.setColor(new Color(255, 210, 140));
+            String descBot = "Mão do Bot: " + maoBotShowdown.getDescricaoCurta();
+            FontMetrics fmDesc = g.getFontMetrics();
+            g.drawString(descBot, cx - (fmDesc.stringWidth(descBot) / 2), cardY + cardH + 16);
         }
     }
 
@@ -258,58 +234,62 @@ public class PokerTableView {
         int cx = largura / 2;
         int cy = (altura / 2) - 10;
 
-        // Pote Central (The Pot)
-        g.setColor(new Color(0, 0, 0, 160));
-        g.fillRoundRect(cx - 100, cy - 65, 200, 32, 12, 12);
+        // Pote Central
+        g.setColor(new Color(0, 0, 0, 165));
+        g.fillRoundRect(cx - 115, cy - 68, 230, 32, 12, 12);
         g.setColor(new Color(255, 215, 0));
         g.setStroke(new BasicStroke(1.5f));
-        g.drawRoundRect(cx - 100, cy - 65, 200, 32, 12, 12);
+        g.drawRoundRect(cx - 115, cy - 68, 230, 32, 12, 12);
         g.setStroke(new BasicStroke(1.0f));
 
         g.setFont(new Font("SansSerif", Font.BOLD, 14));
         g.setColor(new Color(255, 235, 120));
-        String txtPote = "POTE: " + formatarMoeda(poteCentral) + " Fichas";
+        String txtPote = "POTE: " + formatarMoeda(engine.getPoteTotal()) + " Fichas";
         FontMetrics fm = g.getFontMetrics();
-        g.drawString(txtPote, cx - (fm.stringWidth(txtPote) / 2), cy - 44);
+        g.drawString(txtPote, cx - (fm.stringWidth(txtPote) / 2), cy - 47);
 
-        // Reserva dos 5 espaços das Cartas Comunitárias (The Board)
+        // 5 espaços reservados do Board comunitário
         int cardW = 60;
         int cardH = 84;
         int gap = 12;
         int totalW = (5 * cardW) + (4 * gap);
         int startX = cx - (totalW / 2);
-        int boardY = cy - 20;
+        int boardY = cy - 22;
 
         boundsBoard.clear();
-        int abertas = faseAtual.getCartasAbertas();
+        List<Card> comunitarias = engine.getCartasComunitarias();
 
         for (int i = 0; i < 5; i++) {
             int x = startX + i * (cardW + gap);
-            Rectangle rect = new Rectangle(x, boardY, cardW, cardH);
-            boundsBoard.add(rect);
+            boundsBoard.add(new Rectangle(x, boardY, cardW, cardH));
 
             String rotuloSlot = (i < 3) ? "FLOP" : (i == 3 ? "TURN" : "RIVER");
-
-            if (i < abertas && i < boardComunitario.size()) {
-                desenharCartaAberta(g, boardComunitario.get(i), x, boardY, cardW, cardH);
+            if (i < comunitarias.size()) {
+                desenharCartaAberta(g, comunitarias.get(i), x, boardY, cardW, cardH);
             } else {
                 desenharSlotVazio(g, x, boardY, cardW, cardH, rotuloSlot);
             }
         }
+
+        // Feedback da última ação da mesa
+        String ultimaAcao = engine.getUltimaAcaoDescricao();
+        if (ultimaAcao != null && !ultimaAcao.isBlank()) {
+            g.setFont(new Font("SansSerif", Font.ITALIC, 12));
+            g.setColor(new Color(235, 225, 195));
+            FontMetrics fmAcao = g.getFontMetrics();
+            g.drawString(ultimaAcao, cx - (fmAcao.stringWidth(ultimaAcao) / 2), boardY + cardH + 22);
+        }
     }
 
     private void desenharSlotVazio(Graphics2D g, int x, int y, int w, int h, String rotulo) {
-        // Fundo semitransparente do slot reservado
         g.setColor(new Color(0, 0, 0, 90));
         g.fillRoundRect(x, y, w, h, 8, 8);
 
-        // Borda tracejada/dourada
         g.setColor(new Color(212, 175, 55, 130));
         g.setStroke(new BasicStroke(1.2f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND, 0, new float[]{4, 4}, 0));
         g.drawRoundRect(x, y, w, h, 8, 8);
         g.setStroke(new BasicStroke(1.0f));
 
-        // Rótulo da posição (FLOP / TURN / RIVER)
         g.setFont(new Font("SansSerif", Font.BOLD, 10));
         g.setColor(new Color(220, 190, 110, 170));
         FontMetrics fm = g.getFontMetrics();
@@ -320,77 +300,93 @@ public class PokerTableView {
         int cx = largura / 2;
         int yJogador = altura - 230;
 
-        // As duas Hole Cards abertas do Jogador
         int cardW = 60;
         int cardH = 84;
         int gap = 14;
         int startX = cx - cardW - (gap / 2);
 
-        for (int i = 0; i < holeCardsJogador.size(); i++) {
+        List<Card> maoJogador = engine.getMaoJogador();
+        for (int i = 0; i < 2; i++) {
             int x = startX + i * (cardW + gap);
-            desenharCartaAberta(g, holeCardsJogador.get(i), x, yJogador, cardW, cardH);
+            if (i < maoJogador.size()) {
+                desenharCartaAberta(g, maoJogador.get(i), x, yJogador, cardW, cardH);
+            } else {
+                desenharSlotVazio(g, x, yJogador, cardW, cardH, "CARTA " + (i + 1));
+            }
         }
 
-        // Rótulo de classificação da mão do jogador
+        // Classificação oficial vinda do motor (a partir do Flop)
+        EvaluatedPokerHand melhorAtual = engine.getMelhorMaoAtualJogador();
+        String textoMao = (melhorAtual != null)
+                ? "Sua Mão: " + melhorAtual.getDescricaoCurta()
+                : (maoJogador.size() == 2 ? "Sua Mão: Cartas fechadas (Pré-Flop)" : "Aguardando distribuição");
+
         g.setFont(new Font("SansSerif", Font.BOLD, 13));
         g.setColor(new Color(255, 230, 140));
-        String rankingMao = "Sua Mão: " + classificarMaoExemplo();
         FontMetrics fm = g.getFontMetrics();
-        g.drawString(rankingMao, cx - (fm.stringWidth(rankingMao) / 2), yJogador + cardH + 18);
+        g.drawString(textoMao, cx - (fm.stringWidth(textoMao) / 2), yJogador + cardH + 18);
 
-        // Saldo e aposta do jogador
+        String marcadorDealer = (engine.getBotaoDealer() == PokerParticipant.JOGADOR) ? " [D]" : "";
+        String infoJogador = "Você" + marcadorDealer
+                + " — Stack: " + formatarMoeda(engine.getSaldoJogador()) + " Fichas"
+                + "  |  Sua Aposta: " + formatarMoeda(engine.getApostaJogadorNaRua());
+
         g.setFont(new Font("SansSerif", Font.PLAIN, 12));
         g.setColor(new Color(180, 240, 180));
-        String infoJogador = "Stack: " + formatarMoeda(stackJogador) + " Fichas  |  Sua Aposta: " + formatarMoeda(apostaJogador);
         FontMetrics fmInfo = g.getFontMetrics();
-        g.drawString(infoJogador, cx - (fmInfo.stringWidth(infoJogador) / 2), yJogador + cardH + 34);
-    }
-
-    private String classificarMaoExemplo() {
-        switch (faseAtual) {
-            case PRE_FLOP:
-                return "Ás e Rei Altos (Conectores de mesmo naipe não-formados)";
-            case FLOP:
-                return "Par de Ás";
-            case TURN:
-                return "Par de Ás (K kicker)";
-            case RIVER:
-            case SHOWDOWN:
-                return "Dois Pares (Áses e Reis)";
-            default:
-                return "Carta Alta";
-        }
+        g.drawString(infoJogador, cx - (fmInfo.stringWidth(infoJogador) / 2), yJogador + cardH + 35);
     }
 
     private void desenharPainelAcoes(Graphics2D g, int largura, int altura) {
         int cx = largura / 2;
-        int yBotoes = altura - 100;
-        int btnW = 125;
+        int yBotoes = altura - 102;
+        int btnW = 152;
         int btnH = 38;
         int gap = 12;
 
-        boolean podeAgir = !maoFinalizada && faseAtual != PokerPhase.SHOWDOWN;
-        boolean devePagar = (apostaBot > apostaJogador);
-        String txtCheckCall = devePagar ? "PAGAR (C)" : "PASSAR (C)";
+        Set<PokerAction> acoesValidas = engine.getAcoesValidasJogador();
+        boolean podeFold = acoesValidas.contains(PokerAction.DESISTIR);
+        boolean podePassar = acoesValidas.contains(PokerAction.PASSAR);
+        boolean podePagar = acoesValidas.contains(PokerAction.PAGAR);
+        boolean podeAumentar = acoesValidas.contains(PokerAction.AUMENTAR);
 
-        // 1. Botão FOLD (Desistir - Tecla F)
+        String txtCheckCall;
+        if (podePagar) {
+            txtCheckCall = "PAGAR " + formatarMoeda(engine.getValorParaPagarJogador()) + " (C)";
+        } else {
+            txtCheckCall = "PASSAR (C)";
+        }
+
+        long aumentoPadrao = engine.getAumentoMinimoJogador();
+        String txtRaise = podeAumentar && aumentoPadrao > 0L
+                ? "AUMENTAR +" + formatarMoeda(aumentoPadrao) + " (R)"
+                : "AUMENTAR (R)";
+
         int xFold = cx - (btnW * 3 / 2) - gap;
         btnFold.setBounds(xFold, yBotoes, btnW, btnH);
-        desenharBotao(g, btnFold, "DESISTIR (F)", new Color(140, 30, 30), podeAgir);
+        desenharBotao(g, btnFold, "DESISTIR (F)", new Color(140, 30, 30), podeFold);
 
-        // 2. Botão CHECK / CALL (Passar ou Pagar - Tecla C ou ESPAÇO)
         int xCheck = cx - (btnW / 2);
         btnCheckCall.setBounds(xCheck, yBotoes, btnW, btnH);
-        desenharBotao(g, btnCheckCall, txtCheckCall, new Color(28, 110, 60), podeAgir);
+        desenharBotao(g, btnCheckCall, txtCheckCall, new Color(28, 110, 60), podePassar || podePagar);
 
-        // 3. Botão RAISE (Aumentar - Tecla R ou 1, 2, 3)
         int xRaise = cx + (btnW / 2) + gap;
         btnRaise.setBounds(xRaise, yBotoes, btnW, btnH);
-        desenharBotao(g, btnRaise, "AUMENTAR (R)", new Color(175, 125, 20), podeAgir && (stackJogador >= valorAumento));
+        desenharBotao(g, btnRaise, txtRaise, new Color(175, 125, 20), podeAumentar);
+
+        // Dica discreta de atalhos de aumento (1 = Mín, 2 = 2x BB, 3 = All-In)
+        if (podeAumentar) {
+            g.setFont(new Font("SansSerif", Font.PLAIN, 11));
+            g.setColor(new Color(220, 210, 185));
+            String dica = "Atalhos de aumento: [1/R] Mínimo (+" + formatarMoeda(aumentoPadrao)
+                    + ")  |  [2] 2x BB  |  [3] All-In (+" + formatarMoeda(engine.getAumentoMaximoJogador()) + ")";
+            FontMetrics fmDica = g.getFontMetrics();
+            g.drawString(dica, cx - (fmDica.stringWidth(dica) / 2), yBotoes + btnH + 18);
+        }
     }
 
-    private void desenharBotaoVoltar(Graphics2D g, int largura, int altura) {
-        int btnW = 150;
+    private void desenharBotaoVoltar(Graphics2D g, int altura) {
+        int btnW = 155;
         int btnH = 34;
         btnVoltar.setBounds(40, altura - 60, btnW, btnH);
 
@@ -408,28 +404,53 @@ public class PokerTableView {
 
     private void desenharBannerDesfecho(Graphics2D g, int largura, int altura) {
         int cx = largura / 2;
-        int bannerW = 480;
-        int bannerH = 95;
+        int bannerW = 540;
+        int bannerH = 112;
         int bannerX = cx - (bannerW / 2);
-        int bannerY = (altura / 2) - 80;
+        int bannerY = (altura / 2) - 96;
 
-        g.setColor(new Color(10, 12, 18, 235));
+        g.setColor(new Color(10, 12, 18, 238));
         g.fillRoundRect(bannerX, bannerY, bannerW, bannerH, 16, 16);
         g.setColor(new Color(255, 215, 0));
         g.setStroke(new BasicStroke(2.0f));
         g.drawRoundRect(bannerX, bannerY, bannerW, bannerH, 16, 16);
         g.setStroke(new BasicStroke(1.0f));
 
-        g.setFont(new Font("SansSerif", Font.BOLD, 16));
+        String tituloDesfecho = getMensagemDesfecho();
+        g.setFont(new Font("SansSerif", Font.BOLD, 15));
         g.setColor(new Color(255, 235, 120));
         FontMetrics fm = g.getFontMetrics();
-        g.drawString(mensagemDesfecho, cx - (fm.stringWidth(mensagemDesfecho) / 2), bannerY + 32);
+        g.drawString(tituloDesfecho, cx - (fm.stringWidth(tituloDesfecho) / 2), bannerY + 28);
 
-        // Botão Nova Mão (N)
-        int btnW = 180;
+        PokerRoundResult res = engine.getResultadoMao();
+        if (res.isShowdown() && engine.getMelhorMaoJogadorShowdown() != null && engine.getMelhorMaoBotShowdown() != null) {
+            String detalhe = "Você: " + engine.getMelhorMaoJogadorShowdown().getDescricaoCurta()
+                    + "  x  Bot: " + engine.getMelhorMaoBotShowdown().getDescricaoCurta();
+            g.setFont(new Font("SansSerif", Font.PLAIN, 12));
+            g.setColor(new Color(220, 230, 240));
+            FontMetrics fmDet = g.getFontMetrics();
+            g.drawString(detalhe, cx - (fmDet.stringWidth(detalhe) / 2), bannerY + 48);
+        }
+
+        int btnW = 190;
         int btnH = 36;
-        btnNovaMao.setBounds(cx - (btnW / 2), bannerY + 45, btnW, btnH);
+        btnNovaMao.setBounds(cx - (btnW / 2), bannerY + 62, btnW, btnH);
         desenharBotao(g, btnNovaMao, "NOVA MÃO (N)", new Color(30, 110, 50), true);
+    }
+
+    private void desenharAlerta(Graphics2D g, int largura, int altura) {
+        if (mensagemAlerta == null || mensagemAlerta.isEmpty() || System.currentTimeMillis() > alertaExpiraEmMs) {
+            return;
+        }
+        int cx = largura / 2;
+        int y = altura - 135;
+        g.setFont(new Font("SansSerif", Font.BOLD, 12));
+        FontMetrics fm = g.getFontMetrics();
+        int w = fm.stringWidth(mensagemAlerta) + 32;
+        g.setColor(new Color(140, 25, 25, 225));
+        g.fillRoundRect(cx - w / 2, y - 16, w, 24, 10, 10);
+        g.setColor(new Color(255, 220, 180));
+        g.drawString(mensagemAlerta, cx - fm.stringWidth(mensagemAlerta) / 2, y);
     }
 
     private void desenharBotao(Graphics2D g, Rectangle rect, String texto, Color corBase, boolean habilitado) {
@@ -478,25 +499,30 @@ public class PokerTableView {
         g.setColor(new Color(212, 175, 55));
         g.drawRoundRect(x, y, w, h, 8, 8);
 
-        // Padrão ornamental do verso
         g.setColor(new Color(30, 60, 120));
         g.drawRoundRect(x + 4, y + 4, w - 8, h - 8, 5, 5);
         g.drawLine(x + 4, y + 4, x + w - 4, y + h - 4);
         g.drawLine(x + w - 4, y + 4, x + 4, y + h - 4);
     }
 
+    // =========================================================================
+    // TRATAMENTO DE CLIQUES E ATALHOS DE TECLADO (DELEGANDO AO PokerEngine)
+    // =========================================================================
+
     /**
      * Processa cliques do mouse na mesa de Poker.
-     * @return true se o usuário clicou para voltar ao salão; false caso contrário.
+     *
+     * @return {@code true} se o usuário clicou no botão "Voltar ao Salão"; {@code false} caso contrário.
      */
     public boolean processarClique(int x, int y) {
         if (btnVoltar.contains(x, y)) {
             return true;
         }
 
-        if (maoFinalizada) {
+        PokerStage estagio = engine.getEstagioAtual();
+        if (estagio.isMaoFinalizada() || estagio == PokerStage.AGUARDANDO_MAO) {
             if (btnNovaMao.contains(x, y)) {
-                iniciarNovaMaoExemplo();
+                iniciarNovaMao();
             }
             return false;
         }
@@ -513,9 +539,13 @@ public class PokerTableView {
     }
 
     /**
-     * Processa comandos de atalho de teclado na mesa de Poker.
+     * Processa comandos de atalho de teclado na mesa de Poker, respeitando
+     * estritamente {@link PokerEngine#getAcoesValidasJogador()}.
      */
     public void processarTecla(String comando) {
+        if (comando == null) {
+            return;
+        }
         if ("B".equalsIgnoreCase(comando) || "VOLTAR".equalsIgnoreCase(comando)) {
             if (screenSaver != null) {
                 screenSaver.processarRetornoB();
@@ -523,9 +553,10 @@ public class PokerTableView {
             return;
         }
 
-        if (maoFinalizada) {
+        PokerStage estagio = engine.getEstagioAtual();
+        if (estagio.isMaoFinalizada() || estagio == PokerStage.AGUARDANDO_MAO) {
             if ("N".equalsIgnoreCase(comando) || "NOVA_MAO".equalsIgnoreCase(comando)) {
-                iniciarNovaMaoExemplo();
+                iniciarNovaMao();
             }
             return;
         }
@@ -536,80 +567,127 @@ public class PokerTableView {
                 || "C".equalsIgnoreCase(comando) || "ESPACO".equalsIgnoreCase(comando)) {
             executarCheckCall();
         } else if ("RAISE".equalsIgnoreCase(comando) || "R".equalsIgnoreCase(comando)
-                || "FICHA_1".equalsIgnoreCase(comando) || "FICHA_2".equalsIgnoreCase(comando) || "FICHA_3".equalsIgnoreCase(comando)) {
+                || "FICHA_1".equalsIgnoreCase(comando)) {
             executarRaise();
+        } else if ("FICHA_2".equalsIgnoreCase(comando)) {
+            executarRaiseComMultiplicadorBB(2L);
+        } else if ("FICHA_3".equalsIgnoreCase(comando)) {
+            executarAllIn();
         }
     }
 
     /**
-     * Executa a ação de Fold (Desistir).
+     * Inicia uma nova mão no motor de Poker.
+     *
+     * @return {@code true} se o motor iniciou a mão; {@code false} caso contrário.
      */
-    public void executarFold() {
-        if (maoFinalizada) return;
-        this.maoFinalizada = true;
-        this.mensagemDesfecho = "Você desistiu da mão (Fold). Vitória do Bot!";
-        this.botCartasReveladas = false;
+    public boolean iniciarNovaMao() {
+        boolean iniciou = engine.iniciarNovaMao();
+        if (!iniciou) {
+            exibirAlerta("Não foi possível iniciar nova mão (verifique saldo para os blinds).");
+        }
+        solicitarRepintura();
+        return iniciou;
     }
 
     /**
-     * Executa a ação de Check ou Call e avança de fase no Texas Hold'em.
+     * Encaminha a ação de Fold (Desistir) ao motor se permitida por {@link PokerEngine#getAcoesValidasJogador()}.
+     *
+     * @return {@code true} se o motor aceitou a desistência.
      */
-    public void executarCheckCall() {
-        if (maoFinalizada) return;
-
-        // Iguala apostas se houver diferença
-        if (apostaBot > apostaJogador) {
-            long diff = apostaBot - apostaJogador;
-            apostaJogador += diff;
-            stackJogador -= diff;
-            poteCentral += diff;
+    public boolean executarFold() {
+        if (!engine.getAcoesValidasJogador().contains(PokerAction.DESISTIR)) {
+            exibirAlerta("Ação Desistir indisponível neste momento.");
+            return false;
         }
-
-        avancarFase();
+        boolean ok = engine.desistir();
+        solicitarRepintura();
+        return ok;
     }
 
     /**
-     * Executa a ação de Raise (Aumentar) e avança de fase.
+     * Encaminha contextualmente {@link PokerEngine#passar()} ou {@link PokerEngine#pagar()}
+     * conforme o conjunto de ações válidas informado pelo motor.
+     *
+     * @return {@code true} se o motor executou Check ou Call.
      */
-    public void executarRaise() {
-        if (maoFinalizada) return;
-        if (stackJogador < valorAumento) return;
-
-        // Jogador aumenta a aposta
-        stackJogador -= valorAumento;
-        apostaJogador += valorAumento;
-        poteCentral += valorAumento;
-
-        // Bot emparelha a aposta de exemplo
-        if (stackBot >= valorAumento) {
-            stackBot -= valorAumento;
-            apostaBot += valorAumento;
-            poteCentral += valorAumento;
+    public boolean executarCheckCall() {
+        Set<PokerAction> acoes = engine.getAcoesValidasJogador();
+        boolean ok = false;
+        if (acoes.contains(PokerAction.PASSAR)) {
+            ok = engine.passar();
+        } else if (acoes.contains(PokerAction.PAGAR)) {
+            ok = engine.pagar();
+        } else {
+            exibirAlerta("Ação Passar/Pagar indisponível neste momento.");
         }
-
-        avancarFase();
+        solicitarRepintura();
+        return ok;
     }
 
-    private void avancarFase() {
-        switch (faseAtual) {
-            case PRE_FLOP:
-                faseAtual = PokerPhase.FLOP;
-                break;
-            case FLOP:
-                faseAtual = PokerPhase.TURN;
-                break;
-            case TURN:
-                faseAtual = PokerPhase.RIVER;
-                break;
-            case RIVER:
-                faseAtual = PokerPhase.SHOWDOWN;
-                maoFinalizada = true;
-                botCartasReveladas = true;
-                mensagemDesfecho = "Showdown: Você venceu a mão com Dois Pares (Áses e Reis)!";
-                break;
-            case SHOWDOWN:
-                maoFinalizada = true;
-                break;
+    /**
+     * Encaminha o aumento mínimo válido ({@link PokerEngine#getAumentoMinimoJogador()}) ao motor.
+     *
+     * @return {@code true} se o aumento foi aceito pelo motor.
+     */
+    public boolean executarRaise() {
+        if (!engine.getAcoesValidasJogador().contains(PokerAction.AUMENTAR)) {
+            exibirAlerta("Ação Aumentar indisponível nesta rua.");
+            return false;
+        }
+        long incremento = engine.getAumentoMinimoJogador();
+        return executarRaiseValor(incremento);
+    }
+
+    /**
+     * Encaminha um aumento específico ao motor (validado exclusivamente pelo motor).
+     *
+     * @param valorAcimaDaApostaAtual valor adicional acima da maior aposta da rua.
+     * @return {@code true} se aceito pelo motor.
+     */
+    public boolean executarRaiseValor(long valorAcimaDaApostaAtual) {
+        if (!engine.getAcoesValidasJogador().contains(PokerAction.AUMENTAR)) {
+            exibirAlerta("Ação Aumentar indisponível nesta rua.");
+            return false;
+        }
+        boolean ok = engine.aumentar(valorAcimaDaApostaAtual);
+        if (!ok) {
+            exibirAlerta("Valor de aumento inválido para a rua atual.");
+        }
+        solicitarRepintura();
+        return ok;
+    }
+
+    private boolean executarRaiseComMultiplicadorBB(long multiplicador) {
+        if (!engine.getAcoesValidasJogador().contains(PokerAction.AUMENTAR)) {
+            exibirAlerta("Ação Aumentar indisponível nesta rua.");
+            return false;
+        }
+        long desejado = Math.multiplyExact(engine.getBigBlind(), multiplicador);
+        long maximo = engine.getAumentoMaximoJogador();
+        long valor = Math.min(desejado, maximo);
+        if (valor < engine.getAumentoMinimoJogador()) {
+            valor = engine.getAumentoMinimoJogador();
+        }
+        return executarRaiseValor(valor);
+    }
+
+    private boolean executarAllIn() {
+        if (!engine.getAcoesValidasJogador().contains(PokerAction.AUMENTAR)) {
+            exibirAlerta("All-In por aumento indisponível nesta rua.");
+            return false;
+        }
+        return executarRaiseValor(engine.getAumentoMaximoJogador());
+    }
+
+    private void exibirAlerta(String msg) {
+        this.mensagemAlerta = msg;
+        this.alertaExpiraEmMs = System.currentTimeMillis() + 3000L;
+    }
+
+    private void solicitarRepintura() {
+        if (screenSaver != null) {
+            screenSaver.repaint();
         }
     }
 
@@ -617,49 +695,62 @@ public class PokerTableView {
         return formatadorMoeda.format(valor);
     }
 
-    // Getters para consulta e testes de interface
-    public PokerPhase getFaseAtual() {
-        return faseAtual;
+    // =========================================================================
+    // CONSULTAS PARA TESTES E INSPECAO DA VIEW (SEM VAZAMENTO DE CARTAS DO BOT)
+    // =========================================================================
+
+    public PokerEngine getEngine() {
+        return engine;
     }
 
-    public void setFaseAtual(PokerPhase fase) {
-        this.faseAtual = fase;
+    public PokerStage getEstagioAtual() {
+        return engine.getEstagioAtual();
     }
 
     public boolean isMaoFinalizada() {
-        return maoFinalizada;
+        return engine.getEstagioAtual().isMaoFinalizada();
     }
 
+    /**
+     * Indica se as cartas do Bot estão efetivamente reveladas pelo motor (exclusivamente no Showdown).
+     */
     public boolean isBotCartasReveladas() {
-        return botCartasReveladas;
+        return !engine.hasCartasOcultasBot() && !engine.getCartasVisiveisBot().isEmpty();
     }
 
     public String getMensagemDesfecho() {
-        return mensagemDesfecho;
+        return engine.getResultadoMao().getDescricaoPadrao();
+    }
+
+    public String getMensagemAlerta() {
+        return mensagemAlerta;
     }
 
     public long getPoteCentral() {
-        return poteCentral;
+        return engine.getPoteTotal();
     }
 
     public long getApostaJogador() {
-        return apostaJogador;
+        return engine.getApostaJogadorNaRua();
     }
 
     public long getApostaBot() {
-        return apostaBot;
+        return engine.getApostaBotNaRua();
     }
 
     public List<Card> getHoleCardsJogador() {
-        return Collections.unmodifiableList(holeCardsJogador);
+        return engine.getMaoJogador();
     }
 
-    public List<Card> getHoleCardsBot() {
-        return Collections.unmodifiableList(holeCardsBot);
+    /**
+     * Retorna exclusivamente as cartas do Bot autorizadas pelo motor (lista vazia fora do Showdown).
+     */
+    public List<Card> getCartasVisiveisBot() {
+        return engine.getCartasVisiveisBot();
     }
 
     public List<Card> getBoardComunitario() {
-        return Collections.unmodifiableList(boardComunitario);
+        return engine.getCartasComunitarias();
     }
 
     public List<Rectangle> getBoundsBoard() {
