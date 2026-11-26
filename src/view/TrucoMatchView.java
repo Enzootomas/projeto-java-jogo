@@ -682,6 +682,17 @@ public class TrucoMatchView {
         if (btnVoltar.contains(x, y)) {
             return true;
         }
+        if (screenSaver != null && exibindoSelecaoModo) {
+            int w = screenSaver.getWidth();
+            int h = screenSaver.getHeight();
+            int painelH = Math.min(500, Math.max(300, h - 80));
+            int py = (h - painelH) / 2;
+            int btnY = py + painelH - 85;
+            int btnX = (w - 260) / 2;
+            if (x >= btnX && x <= btnX + 260 && y >= btnY && y <= btnY + 48) {
+                return true;
+            }
+        }
 
         if (confirmandoTrocaModo) {
             if (btnConfirmarTroca.contains(x, y)) {
