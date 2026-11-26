@@ -337,7 +337,9 @@ public class TexasHoldemGame implements PokerEngine {
         }
 
         boolean allInExatoJogador = (fichasNecessariasDoSaldo == saldoJogador);
-        if (!allInExatoJogador) {
+        boolean allInEfetivoContraBot = (novaApostaTotalDesejada == tetoCoberturaBot);
+        if (!allInExatoJogador && !allInEfetivoContraBot) {
+
             if (valorAcimaDaApostaAtual < bigBlind || valorAcimaDaApostaAtual % 2L != 0L) {
                 return false;
             }
@@ -759,6 +761,29 @@ public class TexasHoldemGame implements PokerEngine {
     }
 
     @Override
+    public long getAumentoMinimoJogador() {
+        if (!isTurnoDoJogador() || !podeParticipanteAumentar(PokerParticipant.JOGADOR)) {
+            return 0L;
+        }
+        long maximoJogador = getAumentoMaximoJogador();
+        long maiorApostaRua = Math.max(apostaJogadorNaRua, apostaBotNaRua);
+        long maximoEfetivoBot = Math.max(0L,
+                Math.subtractExact(Math.addExact(apostaBotNaRua, saldoBot), maiorApostaRua));
+        long tetoEfetivo = Math.min(maximoJogador, maximoEfetivoBot);
+        return Math.min(bigBlind, tetoEfetivo);
+    }
+
+    @Override
+    public long getAumentoMaximoJogador() {
+        if (!isTurnoDoJogador() || !podeParticipanteAumentar(PokerParticipant.JOGADOR)) {
+            return 0L;
+        }
+        long maiorApostaRua = Math.max(apostaJogadorNaRua, apostaBotNaRua);
+        long necessarioParaIgualar = Math.max(0L, Math.subtractExact(maiorApostaRua, apostaJogadorNaRua));
+        return Math.max(0L, Math.subtractExact(saldoJogador, necessarioParaIgualar));
+    }
+
+    @Override
     public Set<PokerAction> getAcoesValidasJogador() {
         if (!isTurnoDoJogador()) {
             return Collections.emptySet();
@@ -802,6 +827,20 @@ public class TexasHoldemGame implements PokerEngine {
     @Override
     public int getQuantidadeCartasBot() {
         return maoBot.size();
+    }
+
+    @Override
+    public EvaluatedPokerHand getMelhorMaoAtualJogador() {
+        if (estagioAtual == PokerStage.SHOWDOWN) {
+            return melhorMaoJogadorShowdown;
+        }
+        if (maoJogador.size() != 2 || cartasComunitarias.size() < 3) {
+            return null;
+        }
+        List<Card> conhecidas = new ArrayList<>(2 + cartasComunitarias.size());
+        conhecidas.addAll(maoJogador);
+        conhecidas.addAll(cartasComunitarias);
+        return PokerHandEvaluator.avaliarMelhorMao(conhecidas);
     }
 
     @Override

@@ -147,6 +147,25 @@ public interface PokerEngine {
     long getBigBlind();
 
     /**
+     * Retorna o menor valor adicional de aumento permitido para o jogador na rua atual
+     * (normalmente {@link #getBigBlind()}, ou o saldo restante apos igualar em caso de all-in).
+     * Retorna {@code 0} caso {@link PokerAction#AUMENTAR} nao esteja disponivel.
+     *
+     * @return aumento minimo valido ({@code >= 0}).
+     */
+    long getAumentoMinimoJogador();
+
+    /**
+     * Retorna o maior valor adicional de aumento que o jogador pode declarar na rua atual
+     * (correspondente a colocar todo o saldo restante apos igualar a aposta da rua em all-in).
+     * Eventual excesso acima do stack do Bot e devolvido automaticamente pelo motor.
+     * Retorna {@code 0} caso {@link PokerAction#AUMENTAR} nao esteja disponivel.
+     *
+     * @return aumento maximo valido ({@code >= 0}).
+     */
+    long getAumentoMaximoJogador();
+
+    /**
      * Retorna o conjunto imutavel de acoes atualmente permitidas para o jogador humano.
      * Se nao for o turno do jogador, retorna conjunto vazio.
      *
@@ -197,6 +216,16 @@ public interface PokerEngine {
      *
      * @return {@link EvaluatedPokerHand} do jogador no Showdown, ou {@code null}.
      */
+    /**
+     * Retorna a melhor mao avaliada de 5 cartas do jogador na fase atual assim que houver
+     * ao menos 5 cartas disponiveis (a partir do {@link PokerStage#FLOP}), utilizando apenas
+     * as 2 cartas do jogador e as cartas comunitarias ja abertas.
+     * Retorna {@code null} em {@link PokerStage#AGUARDANDO_MAO} e {@link PokerStage#PRE_FLOP}.
+     *
+     * @return {@link EvaluatedPokerHand} atual do jogador, ou {@code null} antes do Flop.
+     */
+    EvaluatedPokerHand getMelhorMaoAtualJogador();
+
     EvaluatedPokerHand getMelhorMaoJogadorShowdown();
 
     /**
