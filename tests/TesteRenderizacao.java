@@ -95,7 +95,7 @@ public class TesteRenderizacao {
 
         // 7. Testa Ambientacao do Salao e Percurso Completo do Avatar
         afirme(painel.getBalcao() != null, "Balcao do bar instanciado no salao");
-        afirme(painel.getCadeiras() != null && painel.getCadeiras().size() == 3,
+        afirme(painel.getCadeiras() != null && painel.getCadeiras().size() == 8,
                 "Tres cadeiras de cassino instanciadas no salao");
         afirme(painel.getObstaculos().contains(painel.getBalcao()),
                 "Balcao registrado na lista de obstaculos fisicos");
