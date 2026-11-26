@@ -1,22 +1,22 @@
 package model;
 
-import javax.imageio.ImageIO;
+import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Font;
 import java.awt.FontMetrics;
 import java.awt.Graphics2D;
 import java.awt.Image;
-import java.io.File;
-import java.io.IOException;
 
 /**
  * Representa uma mesa interativa no salão do cassino.
  *
- * Pilares de POO demonstrados:
- * - Herança: estende MyRectangle (que estende MyShape), herdando atributos de
- *   posição e dimensão que definem o FOOTPRINT (base física sólida no chão).
- * - Polimorfismo: sobrescreve draw(Graphics2D g) para renderizar o sprite da mesa
- *   alinhado isometricamente ao ponto de apoio da base no chão.
+ * <p>Pilares de POO demonstrados:</p>
+ * <ul>
+ *   <li><strong>Herança:</strong> estende {@link MyRectangle} (e {@link MyShape}), usando posição e
+ *       dimensão como o FOOTPRINT sólido no solo.</li>
+ *   <li><strong>Polimorfismo:</strong> sobrescreve {@link #draw(Graphics2D)} para renderizar o sprite
+ *       isométrico da mesa, sombra no solo e plaqueta temática de identificação.</li>
+ * </ul>
  */
 public class CasinoTable extends MyRectangle {
 
@@ -25,18 +25,6 @@ public class CasinoTable extends MyRectangle {
     private double originY;
     private String gameName;
 
-    /**
-     * Construtor da mesa do cassino.
-     *
-     * @param x              coordenada X da base no mundo (em pixels de mundo)
-     * @param y              coordenada Y da base no mundo (em pixels de mundo)
-     * @param footprintWidth largura da base sólida no chão
-     * @param footprintDepth profundidade da base sólida no chão
-     * @param imagePath      caminho para o sprite PNG da mesa
-     * @param gameName       nome do jogo (ex.: "Blackjack")
-     * @param originX        origem horizontal da projeção isométrica
-     * @param originY        origem vertical da projeção isométrica
-     */
     public CasinoTable(int x, int y, int footprintWidth, int footprintDepth,
                        String imagePath, String gameName, double originX, double originY) {
         super(x, y, footprintWidth, footprintDepth, new Color(20, 115, 60));
@@ -52,21 +40,14 @@ public class CasinoTable extends MyRectangle {
         this.originY = originY;
     }
 
-    /**
-     * Calcula o valor de profundidade Z para ordenação visual correta no chão.
-     */
     public double getDepthZ() {
         return IsometricHelper.getDepthZ(this.x, this.y, this.width, this.height, originY);
     }
 
-    /**
-     * Verifica se o avatar está a uma distância mínima de interação da mesa.
-     */
     public boolean isPlayerNear(MyCharacter player, int radius) {
         if (player == null) {
             return false;
         }
-        // Caixa de interação expandida
         MyRectangle interactionZone = new MyRectangle(
                 this.x - radius,
                 this.y - radius,
@@ -76,11 +57,6 @@ public class CasinoTable extends MyRectangle {
         return interactionZone.intersects(player);
     }
 
-    /**
-     * Calcula a distância ao quadrado entre o centro da base física desta mesa
-     * e o centro da base física do avatar.
-     * Usado para desempate determinístico quando o avatar está ao alcance de duas mesas.
-     */
     public double getDistanceSqToPlayer(MyCharacter player) {
         if (player == null) {
             return Double.MAX_VALUE;
@@ -95,48 +71,74 @@ public class CasinoTable extends MyRectangle {
         return (dx * dx) + (dy * dy);
     }
 
-    /**
-     * Renderiza a mesa projetada na tela.
-     */
     @Override
     public void draw(Graphics2D g) {
-        // Ponto de apoio no chão (centro da base do footprint)
         double footX = this.x + this.width * 0.5;
         double footY = this.y + this.height * 0.5;
 
         int screenFootX = (int) Math.round(IsometricHelper.toScreenX(footX, footY, originX));
         int screenFootY = (int) Math.round(IsometricHelper.toScreenY(footX, footY, originY));
 
+        // 1. Sombra suave isométrica sob a mesa
+        g.setColor(new Color(0, 0, 0, 72));
+        g.fillOval(screenFootX - 54, screenFootY - 22, 108, 46);
+
+        // 2. Sprite ou fallback geométrico da mesa
         if (this.sprite != null) {
-            // Posiciona o sprite de modo que a base da mesa coincida com a projeção no chão
             int spriteW = sprite.getWidth(null);
             int spriteH = sprite.getHeight(null);
             int drawX = screenFootX - (spriteW / 2);
-            int drawY = screenFootY - spriteH + 18; // offset dos pés no sprite
+            int drawY = screenFootY - spriteH + 18;
             g.drawImage(this.sprite, drawX, drawY, null);
         } else {
-            // Fallback geométrico desenhando a base isométrica
             g.setColor(this.color);
             g.fillOval(screenFootX - 40, screenFootY - 20, 80, 40);
         }
 
-        // Plaqueta de identificação visual da mesa
+        // 3. Plaqueta elegante com cor de destaque por jogo
         if (this.gameName != null && !this.gameName.isEmpty()) {
+            Color corAcento = escolherCorAcentoMesa();
             g.setFont(new Font("SansSerif", Font.BOLD, 10));
             FontMetrics fm = g.getFontMetrics();
             String rotulo = this.gameName.toUpperCase();
             int strW = fm.stringWidth(rotulo);
-            int rotuloX = screenFootX - (strW / 2);
-            int rotuloY = screenFootY - 50;
+            int padX = 8;
+            int boxW = strW + (padX * 2);
+            int boxH = fm.getHeight() + 4;
+            int boxX = screenFootX - (boxW / 2);
+            int boxY = screenFootY - 64;
 
-            g.setColor(new Color(0, 0, 0, 175));
-            g.fillRoundRect(rotuloX - 5, rotuloY - fm.getAscent() - 2, strW + 10, fm.getHeight() + 4, 6, 6);
-            g.setColor(new Color(255, 215, 0));
-            g.drawRoundRect(rotuloX - 5, rotuloY - fm.getAscent() - 2, strW + 10, fm.getHeight() + 4, 6, 6);
+            // Sombra da plaqueta
+            g.setColor(new Color(0, 0, 0, 120));
+            g.fillRoundRect(boxX + 2, boxY + 2, boxW, boxH, 7, 7);
 
-            g.setColor(new Color(255, 235, 130));
-            g.drawString(rotulo, rotuloX, rotuloY);
+            // Fundo escuro aquecido
+            g.setColor(new Color(22, 14, 18, 225));
+            g.fillRoundRect(boxX, boxY, boxW, boxH, 7, 7);
+
+            // Faixa de acento inferior
+            g.setColor(corAcento);
+            g.fillRoundRect(boxX + 3, boxY + boxH - 3, boxW - 6, 2, 2, 2);
+
+            // Borda dourada
+            g.setColor(new Color(235, 198, 86));
+            g.setStroke(new BasicStroke(1.2f));
+            g.drawRoundRect(boxX, boxY, boxW, boxH, 7, 7);
+            g.setStroke(new BasicStroke(1.0f));
+
+            g.setColor(new Color(255, 240, 180));
+            g.drawString(rotulo, boxX + padX, boxY + fm.getAscent() + 2);
         }
+    }
+
+    private Color escolherCorAcentoMesa() {
+        if ("Poker".equalsIgnoreCase(gameName)) {
+            return new Color(196, 48, 68);
+        }
+        if ("Truco".equalsIgnoreCase(gameName)) {
+            return new Color(62, 138, 214);
+        }
+        return new Color(46, 178, 104); // Blackjack
     }
 
     public String getGameName() {
